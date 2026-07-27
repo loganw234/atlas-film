@@ -82,12 +82,19 @@ def apply_palette(c, stops, mix=1.0):
     return c + (mapped - c) * mix
 
 
+def unsharp(img, amount, radius_px):
+    """Output sharpening: unsharp mask at print resolution. Apply last -
+    prints need more sharpening than any screen preview suggests."""
+    return np.clip(img + amount * (img - _blur(img, radius_px)), 0.0, 1.0)
+
+
 def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             vignette=0.0, percentile=99.5, target=0.85,
             bloom=0.0, bloom_radius=0.015,
             bg_kind=None, bg_a="#0c0c12", bg_b="#1c1826",
             bg_center=(0.5, 0.45), bg_strength=1.0,
-            palette=None, palette_mix=1.0):
+            palette=None, palette_mix=1.0,
+            sharpen=0.0, sharpen_radius=1.2):
     E = (exposure if exposure is not None
          else auto_exposure(neg, percentile, target)) * (2.0 ** ev)
     if bloom > 0:
@@ -111,7 +118,10 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
         yy, xx = np.mgrid[0:h, 0:w]
         d2 = ((xx / w - 0.5) ** 2 + (yy / h - 0.5) ** 2)
         c *= (1.0 - vignette * 1.1 * d2)[..., None]
-    return np.clip(c, 0.0, 1.0).astype(np.float32), E
+    c = np.clip(c, 0.0, 1.0).astype(np.float32)
+    if sharpen > 0:
+        c = unsharp(c, sharpen, sharpen_radius)
+    return c, E
 
 
 def write_print(path, img01, dpi=300):
