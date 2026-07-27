@@ -55,21 +55,53 @@ def _blur(img, sigma_px):
     return out
 
 
-def _backdrop(shape, kind, col_a, col_b, center, strength):
-    """A studio backdrop in linear-ish display space: col_a at the edges,
-    col_b at the hot spot. Screened under the render by the caller."""
+def _field(shape, kind, angle, center):
+    """The scalar 0..1 that drives a backdrop gradient."""
     h, w = shape[:2]
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     u, v = xx / w, yy / h
     cx, cy = center
     if kind == "linear":
-        t = 1.0 - np.clip(np.abs(v - cy) * 1.6, 0.0, 1.0)
+        a = np.radians(angle)
+        t = (u - cx) * np.cos(a) + (v - cy) * np.sin(a)
+        t = np.clip(t * 1.4 + 0.5, 0.0, 1.0)
+    elif kind == "floor":
+        # A seamless: brightest at the horizon and falling away above and
+        # below, so the subject stands in a space instead of floating in a void
+        d = v - cy
+        t = np.clip(1.0 - np.abs(d) * 2.0, 0.0, 1.0) ** 1.5
+        t = np.where(d > 0, t * (1.0 - 0.5 * np.clip(d * 2.2, 0.0, 1.0)), t)
     else:  # radial
         t = 1.0 - np.clip(np.sqrt((u - cx) ** 2 + ((v - cy) * h / w) ** 2) * 1.9,
                           0.0, 1.0)
-    t = (t * t)[..., None]
-    a, b = _hex(col_a), _hex(col_b)
-    return strength * (a + (b - a) * t)
+        t = t * t
+    return t.astype(np.float32)
+
+
+def _backdrop(shape, kind, stops, angle, center, strength):
+    """A studio backdrop: any gradient of colour stops, at any angle,
+    screened under the render by the caller."""
+    t = _field(shape, kind, angle, center)
+    xs = np.linspace(0.0, 1.0, len(stops))
+    cols = np.stack([_hex(c) for c in stops])
+    bg = np.stack([np.interp(t, xs, cols[:, ch]) for ch in range(3)], axis=-1)
+    return (strength * bg).astype(np.float32)
+
+
+def _grain(shape, amount, size, seed=7):
+    """Paper grain: noise at a chosen scale, softened so it reads as fibre
+    rather than as pixels."""
+    rng = np.random.default_rng(seed)
+    h, w = shape[:2]
+    size = max(float(size), 1.0)
+    gh, gw = max(1, int(h / size)), max(1, int(w / size))
+    n = rng.random((gh, gw), dtype=np.float32)
+    n = np.repeat(np.repeat(n, int(np.ceil(h / gh)), 0),
+                  int(np.ceil(w / gw)), 1)[:h, :w]
+    n = _blur(n[..., None], max(size * 0.5, 1.0))[..., 0]
+    n -= n.mean()
+    peak = max(float(np.abs(n).max()), 1e-6)
+    return (n / peak * amount).astype(np.float32)
 
 
 def apply_palette(c, stops, mix=1.0):
@@ -91,8 +123,9 @@ def unsharp(img, amount, radius_px):
 def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             vignette=0.0, percentile=99.5, target=0.85,
             bloom=0.0, bloom_radius=0.015,
-            bg_kind=None, bg_a="#0c0c12", bg_b="#1c1826",
-            bg_center=(0.5, 0.45), bg_strength=1.0,
+            bg_kind=None, bg_a="#0c0c12", bg_b="#1c1826", bg_stops=None,
+            bg_angle=90.0, bg_center=(0.5, 0.45), bg_strength=1.0,
+            grain=0.0, grain_size=2.0,
             palette=None, palette_mix=1.0,
             sharpen=0.0, sharpen_radius=1.2):
     E = (exposure if exposure is not None
@@ -110,7 +143,13 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             stops = [s.strip() for s in stops.split(",")]
         c = apply_palette(np.clip(c, 0.0, 1.0), stops, palette_mix)
     if bg_kind:
-        bg = _backdrop(c.shape, bg_kind, bg_a, bg_b, bg_center, bg_strength)
+        stops = bg_stops or [bg_a, bg_b]
+        if isinstance(stops, str):
+            stops = [x.strip() for x in stops.split(",") if x.strip()]
+        if len(stops) < 2:
+            stops = [bg_a, bg_b]
+        bg = _backdrop(c.shape, bg_kind, stops, bg_angle,
+                       bg_center, bg_strength)
         c = bg + c - bg * c                        # screen: light on backdrop
     c = np.clip(c, 0.0, 1.0) ** gamma
     if vignette > 0:
@@ -121,6 +160,12 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     c = np.clip(c, 0.0, 1.0).astype(np.float32)
     if sharpen > 0:
         c = unsharp(c, sharpen, sharpen_radius)
+    if grain > 0:
+        # strongest in the midtones, where film grain actually sits
+        lum = 0.299 * c[..., 0] + 0.587 * c[..., 1] + 0.114 * c[..., 2]
+        mask = (1.0 - np.abs(2.0 * lum - 1.0))[..., None]
+        g = _grain(c.shape, grain, grain_size)[..., None]
+        c = np.clip(c + g * mask, 0.0, 1.0)
     return c, E
 
 
