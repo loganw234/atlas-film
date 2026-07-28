@@ -37,8 +37,61 @@ def _hex(c):
     return np.array([int(c[i:i + 2], 16) / 255.0 for i in (0, 2, 4)], np.float32)
 
 
+def _boxn(img, r, n=3):
+    """n box passes per axis via cumsum; three approximates a gaussian."""
+    out = img
+    for _ in range(n):
+        for axis in (0, 1):
+            n = out.shape[axis]
+            cs = np.cumsum(out, axis=axis, dtype=np.float32)
+            cs = np.concatenate([np.zeros_like(np.take(cs, [0], axis=axis)), cs],
+                                axis=axis)
+            hi = np.minimum(np.arange(n) + r + 1, n)
+            lo = np.maximum(np.arange(n) - r, 0)
+            out = (np.take(cs, hi, axis=axis) - np.take(cs, lo, axis=axis))                 / (hi - lo).reshape([-1 if a == axis else 1
+                                     for a in range(out.ndim)])
+    return out
+
+
+def _box3(img, r):
+    return _boxn(img, r, 3)
+
+
 def _blur(img, sigma_px):
-    """Separable gaussian-ish blur: three box passes via cumsum. O(n)."""
+    """Blur, computed at whatever resolution the result can actually hold.
+
+    A blur destroys exactly the detail that makes it expensive, so running
+    it at full size is wasted work: for a wide radius the answer is
+    downsampled, blurred small, and resampled back. At print size this is
+    the difference between five seconds and a fraction of one, and the
+    output is indistinguishable because the discarded frequencies were
+    about to be discarded anyway.
+    """
+    h, w = img.shape[:2]
+    # keep ~4 samples per sigma after shrinking; below that there is
+    # nothing to gain and blockiness starts to show through
+    f = max(1, min(int(sigma_px / 4.0), h // 32, w // 32))
+    if f <= 1:
+        return _box3(img, max(1, int(sigma_px * 0.55)))
+
+    ph, pw = (-h) % f, (-w) % f
+    if ph or pw:
+        img = np.pad(img, ((0, ph), (0, pw), (0, 0)), mode="edge")
+    H, W = img.shape[0] // f, img.shape[1] // f
+    small = img.reshape(H, f, W, f, img.shape[2]).mean(axis=(1, 3))
+
+    small = _box3(small, max(1, int((sigma_px / f) * 0.55)))
+
+    big = np.repeat(np.repeat(small, f, axis=0), f, axis=1)
+    # one pass, not three: the small image is already smooth, so this only
+    # has to hide the resample steps. Three passes here cost more than the
+    # full-resolution blur they were meant to replace.
+    big = _boxn(big, max(1, f // 2), n=1)
+    return big[:h, :w]
+
+
+def _blur_full(img, sigma_px):
+    """The original full-resolution path, kept for reference."""
     r = max(1, int(sigma_px * 0.55))
     out = img
     for _ in range(3):
