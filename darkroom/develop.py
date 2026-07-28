@@ -412,6 +412,133 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
     return (_hex(pr["base"]) * t).astype(np.float32)
 
 
+def solarise(neg, E, *, amount=0.8, fog=0.18, shield=8.0,
+             mackie=0.0, mackie_um=90.0):
+    """The Sabattier effect: re-expose the print part-way through developing.
+
+    This one is derived rather than imitated, which is worth spelling out
+    because most implementations are a folded curve applied to the output.
+    What actually happens is that development is interrupted and the whole
+    sheet is exposed to light a second time. Silver already formed by the
+    first development is opaque, so it SHIELDS the emulsion underneath it
+    from the second exposure - Beer-Lambert, through the print's own
+    density. Dense areas therefore receive almost nothing and resist;
+    thin areas receive the lot and darken. The tonal scale partly reverses
+    on its own, from the shielding, with no curve folded by hand:
+
+        D2 = fog * exp(-shield * D1)
+
+    MACKIE LINES are the second half of the effect and a separate
+    mechanism: developer is consumed where it works hardest, so a point
+    beside a heavily developing region finds less of it left. Density
+    therefore gains where it exceeds its own neighbourhood and loses where
+    it falls short, which is the adjacency effect, and along a strong edge
+    it lays down the bright seam Man Ray built a career on. The
+    neighbourhood is measured in microns on the sheet, so the seam is the
+    same physical width at any print size.
+
+    Returns a negative, so everything downstream is unchanged.
+    """
+    if amount <= 0 and mackie <= 0:
+        return neg
+    d1 = 1.0 - np.exp(-np.maximum(neg, 0.0) * E)      # density so far, 0..1
+    d = d1
+    if amount > 0:
+        d = d1 + amount * fog * np.exp(-shield * d1)
+    if mackie > 0:
+        # developer exhaustion: what a point gains over its neighbourhood
+        d = d + mackie * (d - blur_microns(d, mackie_um))
+    d = np.clip(d, 0.0, 0.999)
+    return (-np.log1p(-d) / max(E, 1e-9)).astype(np.float32)
+
+
+# Three pigments, three separations, in register. The historic colour
+# process, and the only one here that is genuinely subtractive rather than
+# a tone map: each layer's transmittance multiplies the next, so where two
+# pigments overlap the light really is filtered twice.
+TRICOLOUR = {
+    # carbro: pigmented gelatin, dense and glossy, a long scale
+    "carbro": dict(base="#f4efe2", dmax=(1.55, 1.60, 1.45),
+                   toe=(1.05, 1.05, 0.95), speed=(1.00, 1.00, 1.05),
+                   pigments=("#12b5c8", "#d4176b", "#f2cf1e")),
+    # gum bichromate: softer, shorter scale, the pigment sitting in relief
+    "gum3":   dict(base="#f2ecdf", dmax=(1.25, 1.30, 1.20),
+                   toe=(1.55, 1.55, 1.40), speed=(0.85, 0.85, 0.90),
+                   pigments=("#2a9fb8", "#b83a72", "#d8bf4a")),
+}
+
+
+def _shift(img, dx, dy):
+    """Translate by a real number of pixels, bilinearly.
+
+    Whole-pixel rolls would make misregistration a step function of print
+    size, which is the same trap the optical stages fell into."""
+    if abs(dx) < 1e-4 and abs(dy) < 1e-4:
+        return img
+    x0, y0 = int(np.floor(dx)), int(np.floor(dy))
+    fx, fy = dx - x0, dy - y0
+    out = np.zeros_like(img)
+    for ox, wx in ((x0, 1 - fx), (x0 + 1, fx)):
+        if wx == 0:
+            continue
+        for oy, wy in ((y0, 1 - fy), (y0 + 1, fy)):
+            if wy == 0:
+                continue
+            out += wx * wy * np.roll(np.roll(img, oy, axis=0), ox, axis=1)
+    return out
+
+
+def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
+                    dmax_mul=1.0, registration_um=0.0):
+    """Separate through red, green and blue; print three pigment layers.
+
+    We hold full colour data, so the separations are honest: the red
+    separation really is what the red channel recorded, not a channel
+    invented from a monochrome image. Each layer gets its own response
+    curve, and the three transmittances MULTIPLY, which is what makes the
+    colour subtractive rather than a palette applied afterwards.
+
+    The one thing worth stating carefully is the SENSE of each layer,
+    because getting it backwards is easy and gives a print with no colour
+    in it at all - which is what a first attempt here did. The chain is
+    subject -> separation negative -> pigment matrix, so the cyan matrix
+    is made FROM the red separation and carries pigment in inverse
+    proportion to the red light: cyan is what removes red, so it must be
+    thin where the subject was red. The deposit is therefore the total
+    quantity of light, split among the three pigments by the COMPLEMENT of
+    the colour that light had. Light that was red lays down magenta and
+    yellow and almost no cyan, and prints red.
+
+    `registration_um` offsets each layer by that distance on the sheet, in
+    a different direction per layer - three plates were printed in three
+    passes and never landed perfectly, and that near-miss is most of why
+    the real thing looks the way it does.
+    """
+    pr = TRICOLOUR[name]
+    pig = pigments or pr["pigments"]
+    base = _hex(pr["base"])
+    t = np.ones_like(neg)
+    px = (registration_um / _pitch_um(neg.shape[1], neg.shape[0])
+          if registration_um else 0.0)
+    neg = np.maximum(neg, 0.0)
+    # how much light there was, and what colour it was
+    lum = (0.299 * neg[..., 0] + 0.587 * neg[..., 1] + 0.114 * neg[..., 2])
+    hue = neg / np.maximum(neg.max(axis=-1, keepdims=True), 1e-9)
+    for i in range(3):
+        dose = lum * (1.0 - np.clip(hue[..., i], 0.0, 1.0) * 0.92) \
+            * E * pr["speed"][i]
+        d = (pr["dmax"][i] * dmax_mul) * \
+            (1.0 - np.exp(-dose)) ** (pr["toe"][i] / max(contrast, 1e-6))
+        # the pigment absorbs the complement of its own colour
+        absorb = 1.0 - _hex(pig[i]) * 0.92
+        layer = np.power(10.0, -(d[..., None] * absorb))
+        if px:
+            ang = i * (2.0 * np.pi / 3.0)
+            layer = _shift(layer, px * np.cos(ang), px * np.sin(ang))
+        t = t * layer
+    return (base * t).astype(np.float32)
+
+
 PAPERS = {
     "bright":  "#ffffff",
     "warm":    "#faf6ec",
@@ -499,6 +626,9 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             sharpen=0.0, sharpen_radius=1.2,
             paper=None, subtractive=True, ink=None, ink_density=1.0,
             process=None, proc_contrast=1.0, proc_dmax=1.0,
+            tricolour=None, registration_um=0.0, pigments=None,
+            solar=0.0, solar_fog=0.18, solar_shield=8.0,
+            mackie=0.0, mackie_um=90.0,
             fstop=0.0, diffraction=0.0,
             halation_strength=0.0, halation_radius=140.0,
             shadow=0.0, shadow_radius=0.02,
@@ -506,8 +636,9 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             split_lo="#3a2c1e", split_hi="#dfe9f5"):
     """Negative to print. The order of stages is fixed and physical:
 
-        diffraction -> halation -> [bloom] -> expose -> process/paper
-            -> tone -> backdrop -> grain -> sharpen
+        diffraction -> halation -> [bloom] -> expose -> [solarise]
+            -> process/paper/tricolour -> tone -> backdrop
+            -> grain -> sharpen
 
     The first two act on the latent image, before there is a print to
     speak of: the lens forms the aerial image and the emulsion scatters
@@ -533,7 +664,23 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     if bloom > 0:
         sigma = bloom_radius * min(neg.shape[0], neg.shape[1])
         neg = neg + bloom * _blur(neg, sigma)     # halation in linear light
-    if process:
+    # solarisation is a DEVELOPMENT effect: the sheet is re-exposed
+    # part-way through developing, so it acts after the exposure is fixed
+    # and before there is a print to read
+    if solar > 0 or mackie > 0:
+        neg = solarise(neg, E, amount=solar, fog=solar_fog,
+                       shield=solar_shield, mackie=mackie, mackie_um=mackie_um)
+    if tricolour:
+        c = tricolour_print(neg, E * ink_density, tricolour,
+                            pigments=pigments, contrast=proc_contrast,
+                            dmax_mul=proc_dmax,
+                            registration_um=registration_um)
+        if shadow > 0:
+            base = _hex(TRICOLOUR[tricolour]["base"])
+            sh = shadow_field(np.clip(c / np.maximum(base, 1e-6), 0, 1),
+                              strength=shadow, radius=shadow_radius)
+            c = c * (1.0 - sh[..., None])
+    elif process:
         c = process_print(neg, E * ink_density, process, pigment=ink,
                           contrast=proc_contrast, dmax_mul=proc_dmax)
         if shadow > 0:
@@ -568,7 +715,8 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
         bg = _backdrop(c.shape, bg_kind, stops, bg_angle,
                        bg_center, bg_strength)
         c = bg + c - bg * c                        # screen: light on backdrop
-    c = np.clip(c, 0.0, 1.0) ** (1.0 / gamma if (paper or process) else gamma)
+    c = np.clip(c, 0.0, 1.0) ** (1.0 / gamma
+                                 if (paper or process or tricolour) else gamma)
     if vignette > 0:
         h, w = c.shape[:2]
         yy, xx = np.mgrid[0:h, 0:w]
