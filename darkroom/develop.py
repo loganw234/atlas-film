@@ -57,6 +57,56 @@ def _box3(img, r):
     return _boxn(img, r, 3)
 
 
+def _boxn_frac(img, r, n=3):
+    """Box passes with a REAL radius, by weighting the two edge samples.
+
+    `_boxn` rounds its radius down to a whole pixel, which is invisible at
+    a radius of twenty and fatal at a radius of two. The annulus below is
+    the difference of two blurs; when both round to the same box the
+    difference is not approximate but exactly zero, and halation silently
+    disappears at small print sizes. Measured before this existed: a
+    140-micron ring vanished entirely on 900px and 1800px sheets and
+    appeared only at 3600.
+
+    `_boxn` is deliberately left alone. Bloom, sharpening and the backdrop
+    all run through it, and changing their radii by a fraction of a pixel
+    would alter every grade ever approved.
+    """
+    r = float(max(r, 0.0))
+    if r < 1e-3:
+        return img
+    r0 = int(r)
+    frac = r - r0
+    if frac < 1e-6:
+        return _boxn(img, r0, n)
+    out = img
+    for _ in range(n):
+        for axis in (0, 1):
+            m = out.shape[axis]
+            idx = np.arange(m)
+            cs = np.cumsum(out, axis=axis, dtype=np.float32)
+            cs = np.concatenate([np.zeros_like(np.take(cs, [0], axis=axis)), cs],
+                                axis=axis)
+            hi = np.minimum(idx + r0 + 1, m)
+            lo = np.maximum(idx - r0, 0)
+            acc = np.take(cs, hi, axis=axis) - np.take(cs, lo, axis=axis)
+            cnt = (hi - lo).astype(np.float32)
+            # the partial pixel just outside the whole-pixel window, on
+            # each side, counted only where it is really there
+            hi_i, lo_i = idx + r0 + 1, idx - r0 - 1
+            wh = (hi_i <= m - 1).astype(np.float32)
+            wl = (lo_i >= 0).astype(np.float32)
+            shape = [-1 if a == axis else 1 for a in range(out.ndim)]
+            acc = acc + frac * (
+                np.take(out, np.clip(hi_i, 0, m - 1), axis=axis)
+                * wh.reshape(shape)
+                + np.take(out, np.clip(lo_i, 0, m - 1), axis=axis)
+                * wl.reshape(shape))
+            cnt = cnt + frac * (wh + wl)
+            out = acc / cnt.reshape(shape)
+    return out
+
+
 def _blur(img, sigma_px):
     """Blur, computed at whatever resolution the result can actually hold.
 
@@ -106,6 +156,131 @@ def _blur_full(img, sigma_px):
                 / (hi - lo).reshape([-1 if a == axis else 1
                                      for a in range(out.ndim)])
     return out
+
+
+# ---------------------------------------------------------------------
+# What happens to the light before the film is developed.
+#
+# Order matters and is physical: the aerial image is formed by the lens
+# (diffraction), then light enters the emulsion and some of it bounces off
+# the film base and re-exposes from behind (halation). Both act on the
+# latent image, so both belong to the negative rather than the print.
+#
+# Sizes are given on the SHEET, in microns, and converted to pixels using
+# the sheet's own dimensions. A given lens therefore behaves identically
+# whether the file is printed at twelve inches or forty-eight: the same
+# physical blur simply lands on a different number of pixels.
+
+SENSOR_H_UM = 96_000.0                 # the 4x5 sheet, short dimension
+SENSOR_W_UM = 120_000.0
+LAMBDA_UM = (0.610, 0.545, 0.465)      # where each channel lives, roughly
+
+
+def _pitch_um(width, height):
+    """Microns of sheet per pixel of file."""
+    sensor = SENSOR_H_UM if width >= height else SENSOR_W_UM
+    return sensor / max(min(width, height), 1)
+
+
+def _box_variance(r, n=3):
+    """Variance in px^2 of n box passes of real half-width r."""
+    r0 = int(r)
+    f = r - r0
+    w = (2 * r0 + 1) + 2 * f
+    v1 = (r0 * (r0 + 1) * (2 * r0 + 1) / 3.0 + 2 * f * (r0 + 1) ** 2) / w
+    return n * v1
+
+
+def _radius_for_sigma(sigma_px, n=3, tol=1e-6):
+    """The box half-width whose n passes have the wanted standard deviation.
+
+    Needed because a FRACTIONAL box is not a narrow kernel: its side taps
+    sit at plus and minus one whole pixel no matter how small the radius,
+    only their weight shrinks. So the usual `radius = 0.55 * sigma` rule,
+    which is calibrated for whole-pixel boxes, badly over-blurs below a
+    pixel - measured at f/64 on a 900px sheet, it widened an edge by 89
+    microns where the aperture calls for 43. Solving for the variance
+    directly is exact at every scale and costs one scalar bisection.
+    """
+    want = sigma_px * sigma_px
+    if want <= 0:
+        return 0.0
+    lo, hi = 0.0, 1.0
+    while _box_variance(hi, n) < want:
+        hi *= 2.0
+        if hi > 1e6:
+            break
+    while hi - lo > tol:
+        mid = 0.5 * (lo + hi)
+        if _box_variance(mid, n) < want:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def blur_microns(img, sigma_um):
+    """Gaussian-ish blur of a width measured on the SHEET, not on the file.
+
+    This is the whole reason the optical stages reproduce across formats.
+    A 140-micron halation radius is 140 microns whether the negative is
+    read out at 3600 pixels or 14400; expressed in pixels it would be 5 or
+    21, and the same two numbers would describe two different lenses.
+    Anything with a physical size belongs here.
+    """
+    px = sigma_um / _pitch_um(img.shape[1], img.shape[0])
+    if px < 0.03:
+        return img
+    if px >= 12.0:
+        # wide enough that whole-pixel rounding is a rounding error, so
+        # take the multiresolution path and its speed. `_blur` works in
+        # its own units, where sigma comes out about 0.55x the argument.
+        return _blur(img, px / 0.55)
+    return _boxn_frac(img, _radius_for_sigma(px), n=3)
+
+
+def diffraction_blur(neg, fstop, *, amount=1.0):
+    """Soften by the diffraction limit of the aperture actually used.
+
+    The Airy disk's first zero sits at 1.22*lambda*N. At f/64 and green
+    light that is 43 microns, which on a 4x5 sheet read out at 7200 pixels
+    is about three pixels - small, real, and exactly the reason large
+    format stops down only so far. Each channel gets its own wavelength,
+    so the softening carries a faint chromatic edge for free.
+
+    This is the instrument constrained by its own optics: Plate XLIX
+    computes these patterns from first principles.
+    """
+    if not fstop or amount <= 0:
+        return neg
+    out = np.empty_like(neg)
+    for ch in range(3):
+        # 1.22*lambda*N is the first zero; the gaussian that best fits an
+        # Airy disk has sigma about 0.42 of it, which is the number to
+        # blur by
+        sigma_um = 0.42 * 1.22 * LAMBDA_UM[ch] * float(fstop) * amount
+        out[..., ch] = blur_microns(neg[..., ch:ch+1], sigma_um)[..., 0]
+    return out
+
+
+def halation(neg, *, strength=0.35, radius_um=140.0, inner=0.45):
+    """The ring, not the glow.
+
+    Light that reaches the emulsion partly passes through it, reflects off
+    the film base and comes back to expose from behind - displaced by
+    twice the base thickness. What that leaves is an offset ANNULUS around
+    a highlight, not a symmetric haze, and it is strongest in red because
+    red penetrates deepest. That is why halation reads as a red-orange
+    corona rather than a soft bloom. (`bloom` remains available for the
+    symmetric kind; this is the one film actually does.)
+    """
+    if strength <= 0:
+        return neg
+    per_channel = (1.0, 0.42, 0.16)          # red goes deepest
+    ring = (blur_microns(neg, radius_um)
+            - blur_microns(neg, radius_um * inner))
+    ring = np.clip(ring, 0.0, None)
+    return neg + ring * (strength * np.array(per_channel, np.float32))
 
 
 def _field(shape, kind, angle, center):
@@ -324,10 +499,35 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             sharpen=0.0, sharpen_radius=1.2,
             paper=None, subtractive=True, ink=None, ink_density=1.0,
             process=None, proc_contrast=1.0, proc_dmax=1.0,
+            fstop=0.0, diffraction=0.0,
+            halation_strength=0.0, halation_radius=140.0,
             shadow=0.0, shadow_radius=0.02,
             shoulder=0.0, split=0.0,
             split_lo="#3a2c1e", split_hi="#dfe9f5"):
+    """Negative to print. The order of stages is fixed and physical:
+
+        diffraction -> halation -> [bloom] -> expose -> process/paper
+            -> tone -> backdrop -> grain -> sharpen
+
+    The first two act on the latent image, before there is a print to
+    speak of: the lens forms the aerial image and the emulsion scatters
+    what reaches it. Everything from `expose` onward is the darkroom.
+    Bloom sits between them because it is not an emulsion effect at all -
+    it is a glow, kept because it is useful, and `halation` is the one
+    film actually does.
+
+    Every optical stage is off at its default, and off is not a lie: a
+    virtual camera with ideal optics is an honest instrument. Turning
+    diffraction on trades that claim for a different true one - that the
+    lens obeys the diffraction limit at the aperture it reports.
+    """
     neg = np.nan_to_num(neg, nan=0.0, posinf=0.0, neginf=0.0)
+    # the lens, then the emulsion - both before anything is developed
+    if diffraction > 0 and fstop:
+        neg = diffraction_blur(neg, fstop, amount=diffraction)
+    if halation_strength > 0:
+        neg = halation(neg, strength=halation_strength,
+                       radius_um=halation_radius)
     E = (exposure if exposure is not None
          else auto_exposure(neg, percentile, target)) * (2.0 ** ev)
     if bloom > 0:
