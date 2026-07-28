@@ -173,6 +173,83 @@ def unsharp(img, amount, radius_px):
     return np.clip(img + amount * (img - _blur(img, radius_px)), 0.0, 1.0)
 
 
+PAPERS = {
+    "bright":  "#ffffff",
+    "warm":    "#faf6ec",
+    "cream":   "#f3ebd8",
+    "rag":     "#efe9dd",
+    "newsprint": "#e8e2d2",
+}
+
+
+def paper_print(neg, E, paper="#faf6ec", subtractive=True, ink=None):
+    """Render the measure as ink on paper instead of light in darkness.
+
+    The additive pipeline is exact for a luminous object photographed
+    against black: brightness accumulates where sample points land. Paper
+    is the opposite medium and wants the opposite law - Beer-Lambert
+    absorption, where density subtracts from the light the sheet reflects:
+
+        reflected = paper * exp(-density)
+
+    That is the physics of dye on a page rather than an effect applied to
+    look like one. Where filaments cross they grow darker, the way
+    overlapping ink does in an etching, instead of burning toward white.
+
+    With subtractive colour the plate's own hue becomes the ink's: light
+    that was emitted red is absorbed as red ink, which takes out green and
+    blue and leaves red. Without it the whole measure prints in one
+    neutral ink, which is what a single-plate lithograph would give.
+    """
+    d = (0.299 * neg[..., 0] + 0.587 * neg[..., 1] + 0.114 * neg[..., 2])
+    if subtractive:
+        peak = np.maximum(neg.max(axis=-1, keepdims=True), 1e-9)
+        hue = np.clip(neg / peak, 0.0, 1.0)          # what colour the light was
+        absorb = d[..., None] * (1.0 - hue * 0.85)   # ink takes out the rest
+    else:
+        absorb = d[..., None] * np.ones(3, np.float32)
+    if ink is not None:
+        absorb = absorb * (1.0 - _hex(ink) * 0.85)
+    t = np.exp(-absorb * E)                          # transmittance of the ink
+    return t.astype(np.float32)
+
+
+def shadow_field(t, *, strength=0.35, radius=0.02, offset=(0.004, 0.010),
+                 bite=1.6):
+    """A soft shadow cast onto the sheet by the printed form.
+
+    It darkens the paper UNDER the ink rather than being blended against
+    it - the first version composited the two by coverage, which for a
+    diffuse subject meant nearly the whole frame turned into shadowed
+    paper and the picture went grey. The physical order is: light falls on
+    the sheet, some is blocked, what remains passes through the ink.
+
+    `bite` raises the matte to a power before blurring, so only substantial
+    ink casts anything. Without it, a haze of faint filaments across the
+    whole frame throws a shadow the size of the frame."""
+    matte = np.clip(1.0 - t.max(axis=-1), 0.0, 1.0) ** bite
+    h, w = matte.shape[:2]
+    sig = max(radius * min(h, w), 1.0)
+    dy, dx = int(offset[1] * h), int(offset[0] * w)
+    sh = np.roll(np.roll(matte, dy, axis=0), dx, axis=1)
+    sh = _blur(sh[..., None], sig)[..., 0]
+    return np.clip(sh * strength, 0.0, 0.92).astype(np.float32)
+
+
+def tone_curve(c, shoulder=0.0, split_lo=None, split_hi=None, split=0.0):
+    """A shoulder that rolls highlights off instead of clipping them, and
+    an optional split tone - warm blacks under cool lights, the oldest
+    trick in the printing room."""
+    if shoulder > 0:
+        c = np.clip(c * (1.0 + shoulder) / (1.0 + shoulder * c), 0.0, 1.0)
+    if split > 0 and split_lo and split_hi:
+        lum = (0.299 * c[..., 0] + 0.587 * c[..., 1]
+               + 0.114 * c[..., 2])[..., None]
+        tint = _hex(split_lo) + (_hex(split_hi) - _hex(split_lo)) * lum
+        c = c * (1.0 - split) + c * tint * 2.0 * split
+    return np.clip(c, 0.0, 1.0)
+
+
 def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             vignette=0.0, percentile=99.5, target=0.85,
             bloom=0.0, bloom_radius=0.015,
@@ -180,14 +257,27 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             bg_angle=90.0, bg_center=(0.5, 0.45), bg_strength=1.0,
             grain=0.0, grain_size=2.0,
             palette=None, palette_mix=1.0,
-            sharpen=0.0, sharpen_radius=1.2):
+            sharpen=0.0, sharpen_radius=1.2,
+            paper=None, subtractive=True, ink=None, ink_density=1.0,
+            shadow=0.0, shadow_radius=0.02,
+            shoulder=0.0, split=0.0,
+            split_lo="#3a2c1e", split_hi="#dfe9f5"):
     neg = np.nan_to_num(neg, nan=0.0, posinf=0.0, neginf=0.0)
     E = (exposure if exposure is not None
          else auto_exposure(neg, percentile, target)) * (2.0 ** ev)
     if bloom > 0:
         sigma = bloom_radius * min(neg.shape[0], neg.shape[1])
         neg = neg + bloom * _blur(neg, sigma)     # halation in linear light
-    c = 1.0 - np.exp(-neg * E)
+    if paper:
+        t = paper_print(neg, E * ink_density, paper=paper,
+                        subtractive=subtractive, ink=ink)
+        sheet = _hex(PAPERS.get(paper, paper)) * np.ones_like(t)
+        if shadow > 0:
+            sh = shadow_field(t, strength=shadow, radius=shadow_radius)
+            sheet = sheet * (1.0 - sh[..., None])
+        c = sheet * t                      # light on the sheet, then through the ink
+    else:
+        c = 1.0 - np.exp(-neg * E)
     lum = (0.299 * c[..., 0] + 0.587 * c[..., 1] + 0.114 * c[..., 2])[..., None]
     c = lum + (c - lum) * saturation
     if palette:
@@ -205,12 +295,14 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
         bg = _backdrop(c.shape, bg_kind, stops, bg_angle,
                        bg_center, bg_strength)
         c = bg + c - bg * c                        # screen: light on backdrop
-    c = np.clip(c, 0.0, 1.0) ** gamma
+    c = np.clip(c, 0.0, 1.0) ** (1.0 / gamma if paper else gamma)
     if vignette > 0:
         h, w = c.shape[:2]
         yy, xx = np.mgrid[0:h, 0:w]
         d2 = ((xx / w - 0.5) ** 2 + (yy / h - 0.5) ** 2)
         c *= (1.0 - vignette * 1.1 * d2)[..., None]
+    if shoulder > 0 or split > 0:
+        c = tone_curve(c, shoulder, split_lo, split_hi, split)
     c = np.clip(c, 0.0, 1.0).astype(np.float32)
     if sharpen > 0:
         c = unsharp(c, sharpen, sharpen_radius)
