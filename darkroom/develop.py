@@ -181,6 +181,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             grain=0.0, grain_size=2.0,
             palette=None, palette_mix=1.0,
             sharpen=0.0, sharpen_radius=1.2):
+    neg = np.nan_to_num(neg, nan=0.0, posinf=0.0, neginf=0.0)
     E = (exposure if exposure is not None
          else auto_exposure(neg, percentile, target)) * (2.0 ** ev)
     if bloom > 0:
