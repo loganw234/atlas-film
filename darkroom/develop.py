@@ -388,11 +388,13 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     return c, E
 
 
-def write_print(path, img01, dpi=300):
+def write_print(path, img01, dpi=300, extratags=None, description=None):
     """16-bit TIFF with resolution tags so editors report the print size."""
     out = (img01 * 65535.0 + 0.5).astype(np.uint16)
     tifffile.imwrite(path, out, photometric="rgb", compression="zlib",
-                     resolution=(dpi, dpi), resolutionunit="INCH")
+                     resolution=(dpi, dpi), resolutionunit="INCH",
+                     description=description,
+                     extratags=extratags or [])
 
 
 def write_preview(path, img01, max_side=2000):
