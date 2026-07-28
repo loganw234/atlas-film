@@ -173,6 +173,70 @@ def unsharp(img, amount, radius_px):
     return np.clip(img + amount * (img - _blur(img, radius_px)), 0.0, 1.0)
 
 
+# ---------------------------------------------------------------------
+# Historic printing processes, derived rather than painted.
+#
+# A gradient map can imitate the colour of a cyanotype; it cannot imitate
+# the reason for it. These build the image the way the process does: the
+# accumulated measure is treated as exposing dose, the dose is converted
+# to deposited substance through a response curve with a toe and a
+# saturating shoulder, and that substance then absorbs light according to
+# its own per-channel coefficients. The blue of a cyanotype comes out
+# because Prussian blue eats red and spares blue, not because blue was
+# chosen - the same way the 22-degree halo in Plate LI comes out of ice
+# geometry rather than being drawn at 22 degrees.
+#
+# Each process is therefore monochrome, as the real ones are: a cyanotype
+# made from a colour negative is still blue. Only `dose` carries over.
+#
+#   dmax   reflection density the process can reach - how black its black
+#   toe    shadow compression; above 1 the deposit starts slowly
+#   speed  sensitivity, how much dose it takes to get going
+#   absorb per-channel absorption of the deposited substance
+#   base   the stock each process is traditionally coated on
+PROCESSES = {
+    # Prussian blue: absorbs hard through the red, barely touches blue
+    "cyanotype": dict(dmax=1.45, toe=1.35, speed=1.00,
+                      absorb=(1.00, 0.62, 0.14), base="#eef2ef"),
+    # silver in a ferric process - warm brown, so blue is taken out
+    "vandyke":   dict(dmax=1.50, toe=1.15, speed=1.10,
+                      absorb=(0.72, 0.92, 1.00), base="#f4ecdc"),
+    # platinum metal in the fibre: a famously long straight scale, low
+    # toe, and a modest dmax - the reason platinotypes look luminous
+    "platinum":  dict(dmax=1.30, toe=0.85, speed=0.90,
+                      absorb=(0.95, 0.97, 1.00), base="#f1ece0"),
+    # silver chloride printed out: reddish through to mauve, short dmax
+    "salt":      dict(dmax=1.20, toe=1.25, speed=0.85,
+                      absorb=(0.66, 0.94, 1.00), base="#f3e8d4"),
+    # albumen sits on the surface rather than in it, so it goes deeper
+    "albumen":   dict(dmax=1.70, toe=1.20, speed=1.00,
+                      absorb=(0.72, 1.00, 0.86), base="#f6eeda"),
+    # modern silver gelatin: neutral, and blacker than any of the above
+    "silver":    dict(dmax=2.10, toe=1.00, speed=1.00,
+                      absorb=(1.00, 1.00, 1.00), base="#fbfbfa"),
+    # gum bichromate carries whatever pigment you grind into it
+    "gum":       dict(dmax=1.35, toe=1.60, speed=0.80,
+                      absorb=(1.00, 1.00, 1.00), base="#f2ecdf",
+                      pigment="#243447"),
+}
+
+
+def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
+    """Expose, develop and read a print in one of the historic processes."""
+    pr = PROCESSES[name]
+    dose = (0.299 * neg[..., 0] + 0.587 * neg[..., 1]
+            + 0.114 * neg[..., 2]) * E * pr["speed"]
+    # dose -> deposited substance. The exponential saturates on its own,
+    # which is the shoulder; the toe exponent slows the start.
+    d = (pr["dmax"] * dmax_mul) * (1.0 - np.exp(-dose)) ** (pr["toe"] / contrast)
+    absorb = np.array(pr["absorb"], np.float32)
+    if pigment or pr.get("pigment"):
+        # a ground pigment absorbs the complement of its own colour
+        absorb = 1.0 - _hex(pigment or pr["pigment"]) * 0.88
+    t = np.power(10.0, -(d[..., None] * absorb))       # optical density
+    return (_hex(pr["base"]) * t).astype(np.float32)
+
+
 PAPERS = {
     "bright":  "#ffffff",
     "warm":    "#faf6ec",
@@ -259,6 +323,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             palette=None, palette_mix=1.0,
             sharpen=0.0, sharpen_radius=1.2,
             paper=None, subtractive=True, ink=None, ink_density=1.0,
+            process=None, proc_contrast=1.0, proc_dmax=1.0,
             shadow=0.0, shadow_radius=0.02,
             shoulder=0.0, split=0.0,
             split_lo="#3a2c1e", split_hi="#dfe9f5"):
@@ -268,7 +333,15 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     if bloom > 0:
         sigma = bloom_radius * min(neg.shape[0], neg.shape[1])
         neg = neg + bloom * _blur(neg, sigma)     # halation in linear light
-    if paper:
+    if process:
+        c = process_print(neg, E * ink_density, process, pigment=ink,
+                          contrast=proc_contrast, dmax_mul=proc_dmax)
+        if shadow > 0:
+            base = _hex(PROCESSES[process]["base"])
+            sh = shadow_field(np.clip(c / np.maximum(base, 1e-6), 0, 1),
+                              strength=shadow, radius=shadow_radius)
+            c = c * (1.0 - sh[..., None])
+    elif paper:
         t = paper_print(neg, E * ink_density, paper=paper,
                         subtractive=subtractive, ink=ink)
         sheet = _hex(PAPERS.get(paper, paper)) * np.ones_like(t)
@@ -295,7 +368,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
         bg = _backdrop(c.shape, bg_kind, stops, bg_angle,
                        bg_center, bg_strength)
         c = bg + c - bg * c                        # screen: light on backdrop
-    c = np.clip(c, 0.0, 1.0) ** (1.0 / gamma if paper else gamma)
+    c = np.clip(c, 0.0, 1.0) ** (1.0 / gamma if (paper or process) else gamma)
     if vignette > 0:
         h, w = c.shape[:2]
         yy, xx = np.mgrid[0:h, 0:w]
