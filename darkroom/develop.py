@@ -176,7 +176,7 @@ SENSOR_W_UM = 120_000.0
 LAMBDA_UM = (0.610, 0.545, 0.465)      # where each channel lives, roughly
 
 
-def _pitch_um(width, height):
+def _pitch_um(width, height, fmt=None):
     """Microns of sheet per pixel of file.
 
     The sheet turns in the holder with the print, so its SHORT dimension
@@ -189,7 +189,18 @@ def _pitch_um(width, height):
     was 10.5px on a 9000x7200 file and 8.4px on 7200x9000. That broke
     the one promise this unit system exists to keep.
     """
-    return SENSOR_H_UM / max(min(width, height), 1)
+    sensor = SENSOR_H_UM
+    if fmt is not None:
+        # the format enters here and nowhere else in the optical stages,
+        # which is the right place: an Airy disk is a fixed size in
+        # microns and does not care what sheet it lands on. What changes
+        # is how many PIXELS it covers, because a smaller sheet read out
+        # at the same pixel count has a finer pitch - which is exactly
+        # why a phone is diffraction limited by f/8 and a 4x5 is not
+        # until f/64.
+        from darkroom import formats
+        sensor = formats.sensor_um(fmt)
+    return sensor / max(min(width, height), 1)
 
 
 def _box_variance(r, n=3):
@@ -229,7 +240,7 @@ def _radius_for_sigma(sigma_px, n=3, tol=1e-6):
     return 0.5 * (lo + hi)
 
 
-def blur_microns(img, sigma_um):
+def blur_microns(img, sigma_um, fmt=None):
     """Gaussian-ish blur of a width measured on the SHEET, not on the file.
 
     This is the whole reason the optical stages reproduce across formats.
@@ -238,7 +249,7 @@ def blur_microns(img, sigma_um):
     21, and the same two numbers would describe two different lenses.
     Anything with a physical size belongs here.
     """
-    px = sigma_um / _pitch_um(img.shape[1], img.shape[0])
+    px = sigma_um / _pitch_um(img.shape[1], img.shape[0], fmt)
     if px < 0.03:
         return img
     if px >= 12.0:
@@ -249,7 +260,7 @@ def blur_microns(img, sigma_um):
     return _boxn_frac(img, _radius_for_sigma(px), n=3)
 
 
-def diffraction_blur(neg, fstop, *, amount=1.0):
+def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None):
     """Soften by the diffraction limit of the aperture actually used.
 
     The Airy disk's first zero sits at 1.22*lambda*N. At f/64 and green
@@ -269,11 +280,13 @@ def diffraction_blur(neg, fstop, *, amount=1.0):
         # Airy disk has sigma about 0.42 of it, which is the number to
         # blur by
         sigma_um = 0.42 * 1.22 * LAMBDA_UM[ch] * float(fstop) * amount
-        out[..., ch] = blur_microns(neg[..., ch:ch+1], sigma_um)[..., 0]
+        out[..., ch] = blur_microns(neg[..., ch:ch+1], sigma_um,
+                                    fmt)[..., 0]
     return out
 
 
-def halation(neg, *, strength=0.35, radius_um=140.0, inner=0.45):
+def halation(neg, *, strength=0.35, radius_um=140.0, inner=0.45,
+             fmt=None):
     """The ring, not the glow.
 
     Light that reaches the emulsion partly passes through it, reflects off
@@ -287,8 +300,8 @@ def halation(neg, *, strength=0.35, radius_um=140.0, inner=0.45):
     if strength <= 0:
         return neg
     per_channel = (1.0, 0.42, 0.16)          # red goes deepest
-    ring = (blur_microns(neg, radius_um)
-            - blur_microns(neg, radius_um * inner))
+    ring = (blur_microns(neg, radius_um, fmt)
+            - blur_microns(neg, radius_um * inner, fmt))
     ring = np.clip(ring, 0.0, None)
     return neg + ring * (strength * np.array(per_channel, np.float32))
 
@@ -423,7 +436,7 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
 
 
 def solarise(neg, E, *, amount=0.8, fog=0.18, shield=8.0,
-             mackie=0.0, mackie_um=90.0):
+             mackie=0.0, mackie_um=90.0, fmt=None):
     """The Sabattier effect: re-expose the print part-way through developing.
 
     This one is derived rather than imitated, which is worth spelling out
@@ -457,7 +470,7 @@ def solarise(neg, E, *, amount=0.8, fog=0.18, shield=8.0,
         d = d1 + amount * fog * np.exp(-shield * d1)
     if mackie > 0:
         # developer exhaustion: what a point gains over its neighbourhood
-        d = d + mackie * (d - blur_microns(d, mackie_um))
+        d = d + mackie * (d - blur_microns(d, mackie_um, fmt))
     d = np.clip(d, 0.0, 0.999)
     return (-np.log1p(-d) / max(E, 1e-9)).astype(np.float32)
 
@@ -647,6 +660,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             paper=None, subtractive=True, ink=None, ink_density=1.0,
             process=None, proc_contrast=1.0, proc_dmax=1.0,
             tricolour=None, registration_um=0.0, pigments=None,
+            fmt=None,
             solar=0.0, solar_fog=0.18, solar_shield=8.0,
             mackie=0.0, mackie_um=90.0,
             fstop=0.0, diffraction=0.0,
@@ -675,10 +689,10 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     neg = np.nan_to_num(neg, nan=0.0, posinf=0.0, neginf=0.0)
     # the lens, then the emulsion - both before anything is developed
     if diffraction > 0 and fstop:
-        neg = diffraction_blur(neg, fstop, amount=diffraction)
+        neg = diffraction_blur(neg, fstop, amount=diffraction, fmt=fmt)
     if halation_strength > 0:
         neg = halation(neg, strength=halation_strength,
-                       radius_um=halation_radius)
+                       radius_um=halation_radius, fmt=fmt)
     E = (exposure if exposure is not None
          else auto_exposure(neg, percentile, target)) * (2.0 ** ev)
     if bloom > 0:
@@ -689,7 +703,8 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     # and before there is a print to read
     if solar > 0 or mackie > 0:
         neg = solarise(neg, E, amount=solar, fog=solar_fog,
-                       shield=solar_shield, mackie=mackie, mackie_um=mackie_um)
+                       shield=solar_shield, mackie=mackie,
+                       mackie_um=mackie_um, fmt=fmt)
     if tricolour:
         c = tricolour_print(neg, E * ink_density, tricolour,
                             pigments=pigments, contrast=proc_contrast,
