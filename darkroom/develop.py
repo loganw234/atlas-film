@@ -177,9 +177,19 @@ LAMBDA_UM = (0.610, 0.545, 0.465)      # where each channel lives, roughly
 
 
 def _pitch_um(width, height):
-    """Microns of sheet per pixel of file."""
-    sensor = SENSOR_H_UM if width >= height else SENSOR_W_UM
-    return sensor / max(min(width, height), 1)
+    """Microns of sheet per pixel of file.
+
+    The sheet turns in the holder with the print, so its SHORT dimension
+    always lies along the file's short axis - 96mm over the short pixel
+    count, in either orientation. An earlier version picked the 120mm
+    dimension for portrait files while still dividing by the short axis,
+    which made every micron-sized stage (halation, diffraction, Mackie
+    lines, tricolour registration) run about 20% smaller on a portrait
+    print than on the identical sheet rotated - measured: a 140um ring
+    was 10.5px on a 9000x7200 file and 8.4px on 7200x9000. That broke
+    the one promise this unit system exists to keep.
+    """
+    return SENSOR_H_UM / max(min(width, height), 1)
 
 
 def _box_variance(r, n=3):
@@ -468,24 +478,34 @@ TRICOLOUR = {
 }
 
 
-def _shift(img, dx, dy):
+def _shift(img, dx, dy, fill=1.0):
     """Translate by a real number of pixels, bilinearly.
 
     Whole-pixel rolls would make misregistration a step function of print
-    size, which is the same trap the optical stages fell into."""
+    size, which is the same trap the optical stages fell into.
+
+    The plate slides; it does not wrap. `np.roll` alone would carry one
+    edge of the frame round to the other, so the image is padded with
+    `fill` first and cropped after. For a pigment layer the honest fill
+    is transmittance 1.0: beyond the slid plate's edge there is simply no
+    pigment, so all the light passes."""
     if abs(dx) < 1e-4 and abs(dy) < 1e-4:
         return img
+    m = int(np.ceil(max(abs(dx), abs(dy)))) + 1
+    pad = np.full((img.shape[0] + 2 * m, img.shape[1] + 2 * m,
+                   img.shape[2]), fill, img.dtype)
+    pad[m:-m, m:-m] = img
     x0, y0 = int(np.floor(dx)), int(np.floor(dy))
     fx, fy = dx - x0, dy - y0
-    out = np.zeros_like(img)
+    out = np.zeros_like(pad)
     for ox, wx in ((x0, 1 - fx), (x0 + 1, fx)):
         if wx == 0:
             continue
         for oy, wy in ((y0, 1 - fy), (y0 + 1, fy)):
             if wy == 0:
                 continue
-            out += wx * wy * np.roll(np.roll(img, oy, axis=0), ox, axis=1)
-    return out
+            out += wx * wy * np.roll(np.roll(pad, oy, axis=0), ox, axis=1)
+    return out[m:-m, m:-m]
 
 
 def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
@@ -736,17 +756,53 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     return c, E
 
 
+def _srgb_icc():
+    """The sRGB profile bytes, if Pillow's lcms is present. Cached."""
+    global _ICC
+    if _ICC is None:
+        try:
+            from PIL import ImageCms
+            _ICC = ImageCms.ImageCmsProfile(
+                ImageCms.createProfile("sRGB")).tobytes()
+        except Exception:                                     # noqa: BLE001
+            _ICC = b""
+    return _ICC
+
+
+_ICC = None
+
+
 def write_print(path, img01, dpi=300, extratags=None, description=None):
-    """16-bit TIFF with resolution tags so editors report the print size."""
+    """16-bit TIFF with resolution tags so editors report the print size.
+
+    An sRGB profile is embedded when available, so a lab's RIP reads the
+    file's intent instead of guessing at an untagged TIFF - the pixels
+    are unchanged either way."""
     out = (img01 * 65535.0 + 0.5).astype(np.uint16)
+    tags = list(extratags or [])
+    icc = _srgb_icc()
+    if icc and not any(t[0] == 34675 for t in tags):
+        tags.append((34675, 7, len(icc), icc, True))
     tifffile.imwrite(path, out, photometric="rgb", compression="zlib",
                      resolution=(dpi, dpi), resolutionunit="INCH",
                      description=description,
-                     extratags=extratags or [])
+                     extratags=tags)
 
 
-def write_preview(path, img01, max_side=2000):
+def write_preview(path, img01, max_side=2000, info=None):
+    """8-bit preview. `info`, if given, is a dict embedded as PNG text -
+    the same provenance the negatives carry, for files that are PNGs."""
     from PIL import Image
     im = Image.fromarray((img01 * 255.0 + 0.5).astype(np.uint8))
     im.thumbnail((max_side, max_side))
-    im.save(path)
+    kw = {}
+    if info and str(path).lower().endswith(".png"):
+        try:
+            from PIL.PngImagePlugin import PngInfo
+            import json as _json
+            pi = PngInfo()
+            pi.add_text("atlas", _json.dumps(info, default=str))
+            kw["pnginfo"] = pi
+        except Exception:                                     # noqa: BLE001
+            pass
+    im.save(path, **kw)
