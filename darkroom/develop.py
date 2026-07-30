@@ -86,6 +86,37 @@ def _par(shape, fn, workers=None):
     list(_pool().map(lambda c: fn(c[0], c[1]), cuts))
 
 
+def _par_tasks(fns, pixels=None):
+    """Run independent WHOLE-ARRAY tasks concurrently.
+
+    Not the same thing as `_par`, which cuts one array into row bands.
+    These are separate blurs that happen to be wanted at the same moment -
+    the three channels of a diffraction softening, the two legs of a
+    halation annulus - each reading the input and writing its own output.
+
+    BIT-IDENTICAL BY CONSTRUCTION, and for a stronger reason than the
+    banded helpers can claim: no task shares an accumulator with any
+    other, so every floating-point operation happens in the same order on
+    the same values no matter what the scheduler does. Only the wall
+    clock changes.
+
+    THIS IS DELIBERATELY NOT THREADING THE BOX KERNEL. Doing that needs
+    halo-overlapped bands plus a way to stop a band edge being taken for
+    the image edge, where the window deliberately shrinks - and a band
+    seam in a halation ring is exactly the kind of optical fault this
+    project has shipped three times because it looked perfect. The
+    structural parallelism here is most of the win for none of that risk.
+    """
+    fns = list(fns)
+    if DEVELOP_THREADS <= 1 or len(fns) < 2 \
+            or (pixels is not None and pixels < _MIN_PAR_PIXELS):
+        for f in fns:
+            f()
+        return
+    # list() so an exception in a task propagates rather than being dropped
+    list(_pool().map(lambda f: f(), fns))
+
+
 def _par_nan_to_num(a):
     out = np.empty_like(a)
 
@@ -167,6 +198,33 @@ def _hex(c):
 # nine blurs behind the diffraction-and-halation path were all paying the
 # full prefix-sum price for a radius of one or two.
 DIRECT_BOX_MAX_R = 14
+
+# The SAME choice, made differently for the optical stages, because they
+# carry a promise the artistic ones do not: a size specified in microns
+# must land the same way on every sheet. `_boxn` feeds bloom, sharpening
+# and the backdrop, all specified in pixels, and its threshold stays where
+# it is. `_boxn_frac` is what halation, diffraction, Mackie lines and
+# tricolour registration go through, and it gets a threshold set by the
+# largest print rather than by the speed crossover.
+#
+# WHY IT IS NOT 14. Prefix-sum error grows with the length of the row it
+# ran down, and a print is a very long row. Measured against a float64
+# reference on negative-like data - dark ground, sparse bright spikes,
+# which is the worst case because a dark window is recovered by
+# differencing two large totals:
+#
+#     row     print @360ppi    direct      prefix     prefix err on
+#                                                     the dark ground
+#     2560    1440p            4.7e-07     1.6e-06     0.183%
+#     14400   40 in            3.8e-07     1.5e-05     1.347%
+#     25920   72 in            3.9e-07     3.6e-05     1.742%
+#
+# Direct is FLAT in the row length; the prefix sum degrades with exactly
+# the thing this unit system exists to be invariant to. 32 covers every
+# print the studio can make - a 48x72 in sheet asks for a box radius of
+# 24.7 - with margin. Above r~20 direct costs about 1.4x on a pass, which
+# is the price of the guarantee and is worth it.
+DIRECT_BOX_MAX_R_EXACT = 32
 
 
 def _box_direct(out, r, axis):
@@ -250,12 +308,14 @@ def _boxn_frac(img, r, n=3):
     for _ in range(n):
         for axis in (0, 1):
             m = out.shape[axis]
-            if r0 <= DIRECT_BOX_MAX_R:
+            if r0 <= DIRECT_BOX_MAX_R_EXACT:
                 # THE PATH THE OPTICS ACTUALLY TAKE. Halation at 140 um is
                 # ~2 px on a 1440p sheet and diffraction at f/32 is 0.3 px,
                 # so every blur behind the eight-second optics path had a
                 # radius of one or two and was paying for six full-image
-                # prefix scans to get it.
+                # prefix scans to get it. At print size the radius is 25
+                # rather than 2, and the reason to sum directly stops being
+                # speed and becomes accuracy - see DIRECT_BOX_MAX_R_EXACT.
                 acc = np.zeros_like(out)
                 cnt = np.zeros(m, np.float32)
                 for d in range(-r0, r0 + 1):
@@ -448,15 +508,40 @@ def blur_microns(img, sigma_um, fmt=None):
     read out at 3600 pixels or 14400; expressed in pixels it would be 5 or
     21, and the same two numbers would describe two different lenses.
     Anything with a physical size belongs here.
+
+    THERE IS NO FAST PATH, AND THERE USED TO BE. Above 12 px this called
+    `_blur`, the multiresolution shortcut, on the grounds that at that
+    width whole-pixel rounding is a rounding error. It is not: `_blur`
+    truncates its radius with `int()` at a DOWNSAMPLED scale, so the sigma
+    it delivers steps as the downsample factor changes. Measured with an
+    impulse, requested against achieved:
+
+        12 px -> +3.8%    13 px -> -4.2%    18 px -> +12.2%    24 px -> +3.8%
+
+    The error changes SIGN, so it is not a calibration constant anybody
+    could have divided out. Below 12 px, on this path, it is 0.00%.
+
+    What that did downstream is the part that mattered. Halation is the
+    difference of two of these blurs, so between the size where the outer
+    leg crosses 12 px and the size where the inner one does, the annulus
+    was one approximate blur minus one exact one. Its width held at
+    exactly 77.00 um up to 24 in and then wandered between 76.26 and 93.49
+    um - non-monotonically, 91.73 at 36 in and 76.26 at 40 in. That is the
+    single promise this function exists to keep, kept below 28 in and
+    broken above it.
+
+    The cost of removing it is real and was chosen deliberately. Measured
+    on a 24 Mpx tile and scaled: at the radius a 48x72 in sheet asks for,
+    the exact path is 5.9x the shortcut, which puts a full-size halation
+    near six minutes rather than one. Nothing below 12 px changed at all,
+    so proofs and Super B are untouched - the cost lands only on the final
+    render of a large print, which is not a thing anybody iterates on.
+    `halation` and `diffraction_blur` now run their independent legs
+    concurrently, which takes some of it back without touching this.
     """
     px = sigma_um / _pitch_um(img.shape[1], img.shape[0], fmt)
     if px < 0.03:
         return img
-    if px >= 12.0:
-        # wide enough that whole-pixel rounding is a rounding error, so
-        # take the multiresolution path and its speed. `_blur` works in
-        # its own units, where sigma comes out about 0.55x the argument.
-        return _blur(img, px / 0.55)
     return _boxn_frac(img, _radius_for_sigma(px), n=3)
 
 
@@ -475,13 +560,21 @@ def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None):
     if not fstop or amount <= 0:
         return neg
     out = np.empty_like(neg)
-    for ch in range(3):
+
+    def channel(ch):
         # 1.22*lambda*N is the first zero; the gaussian that best fits an
         # Airy disk has sigma about 0.42 of it, which is the number to
         # blur by
         sigma_um = 0.42 * 1.22 * LAMBDA_UM[ch] * float(fstop) * amount
-        out[..., ch] = blur_microns(neg[..., ch:ch+1], sigma_um,
-                                    fmt)[..., 0]
+
+        def run():
+            out[..., ch] = blur_microns(neg[..., ch:ch+1], sigma_um,
+                                        fmt)[..., 0]
+        return run
+
+    # three wavelengths, three independent blurs, three disjoint output
+    # channels - concurrent since the exact path made a blur expensive
+    _par_tasks([channel(ch) for ch in range(3)], pixels=neg.shape[0] * neg.shape[1])
     return out
 
 
@@ -500,9 +593,19 @@ def halation(neg, *, strength=0.35, radius_um=140.0, inner=0.45,
     if strength <= 0:
         return neg
     per_channel = (1.0, 0.42, 0.16)          # red goes deepest
-    ring = (blur_microns(neg, radius_um, fmt)
-            - blur_microns(neg, radius_um * inner, fmt))
-    ring = np.clip(ring, 0.0, None)
+    # the two legs of the annulus are independent blurs of the same input,
+    # so they run at the same time. The subtraction below is unchanged and
+    # so is every bit of its result.
+    legs = [None, None]
+
+    def leg(i, um):
+        def run():
+            legs[i] = blur_microns(neg, um, fmt)
+        return run
+
+    _par_tasks([leg(0, radius_um), leg(1, radius_um * inner)],
+               pixels=neg.shape[0] * neg.shape[1])
+    ring = np.clip(legs[0] - legs[1], 0.0, None)
     return neg + ring * (strength * np.array(per_channel, np.float32))
 
 
