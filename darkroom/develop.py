@@ -273,8 +273,10 @@ def _boxn(img, r, n=3):
                                 axis=axis)
             hi = np.minimum(np.arange(m) + r + 1, m)
             lo = np.maximum(np.arange(m) - r, 0)
-            out = (np.take(cs, hi, axis=axis) - np.take(cs, lo, axis=axis))                 / (hi - lo).reshape([-1 if a == axis else 1
-                                     for a in range(out.ndim)])
+            out = ((np.take(cs, hi, axis=axis)
+                    - np.take(cs, lo, axis=axis))
+                   / (hi - lo).reshape([-1 if a == axis else 1
+                                        for a in range(out.ndim)]))
     return out
 
 
