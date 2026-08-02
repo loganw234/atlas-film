@@ -992,6 +992,21 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     lens obeys the diffraction limit at the aperture it reports.
     """
     neg = _par_nan_to_num(neg)
+    # AN F-NUMBER WITH DIFFRACTION OFF IS NEVER DELIBERATE. Off is not a
+    # lie and stays the default, but an f-number is only ever passed by
+    # a caller who wants the aperture's own optics - and a caller who
+    # passes one and forgets `diffraction` gets a picture that looks
+    # perfectly good and has no diffraction in it. That happened: a
+    # figure whose entire subject was the aperture, captioned as showing
+    # the diffraction limit, computed none. Nothing about the output
+    # said so, which is the whole reason this warns.
+    if fstop and diffraction <= 0:
+        import warnings
+        warnings.warn(
+            f"develop() was given fstop={fstop:g} but diffraction=0, so "
+            f"the aperture's Airy blur is NOT being computed. Pass "
+            f"diffraction=1.0 to model it, or fstop=0 if the ideal lens "
+            f"is what you meant.", RuntimeWarning, stacklevel=2)
     # the lens, then the emulsion - both before anything is developed
     if diffraction > 0 and fstop:
         neg = diffraction_blur(neg, fstop, amount=diffraction, fmt=fmt)
