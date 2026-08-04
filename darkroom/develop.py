@@ -729,6 +729,15 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
     pr = PROCESSES[name]
     dose = (0.299 * neg[..., 0] + 0.587 * neg[..., 1]
             + 0.114 * neg[..., 2]) * E * pr["speed"]
+    # THERE IS NO SUCH THING AS NEGATIVE LIGHT, and letting one through
+    # does not produce a dark pixel - it produces NaN, which casts to
+    # black. `1 - exp(-dose)` goes negative below zero, and a negative
+    # base raised to a FRACTIONAL power is undefined. Every process here
+    # has a fractional toe except silver, whose toe is exactly 1.0, so a
+    # single bad sample in the negative came out as six black pixels and
+    # one correct one - found on the seven-process strip, six pixels in
+    # 9.7 million, invisible in review and permanent in print.
+    dose = np.maximum(dose, 0.0)
     # dose -> deposited substance. The exponential saturates on its own,
     # which is the shoulder; the toe exponent slows the start.
     d = (pr["dmax"] * dmax_mul) * (1.0 - np.exp(-dose)) ** (pr["toe"] / contrast)
