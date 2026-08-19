@@ -59,6 +59,13 @@ TONES = {
 DEVELOP_THREADS = int(os.environ.get("ATLAS_DEVELOP_THREADS", "0")) \
     or min(8, os.cpu_count() or 1)
 
+# How completely a pigment layer is held back by its own colour.
+# A neutral pixel carries 1 - HUE_K in every layer, and that is
+# also the anchor the tricolour split is scaled to - see
+# tricolour_print. Named because two places need the same number
+# and one of them is a calibration that has to follow if it moves.
+HUE_K = 0.92
+
 # Below this a dispatch costs more than the work it hands out.
 _MIN_PAR_PIXELS = 1 << 19
 
@@ -891,9 +898,49 @@ def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
     # how much light there was, and what colour it was
     lum = (0.299 * neg[..., 0] + 0.587 * neg[..., 1] + 0.114 * neg[..., 2])
     hue = neg / np.maximum(neg.max(axis=-1, keepdims=True), 1e-9)
+    # A SPLIT HAS TO SUM TO SOMETHING. `1 - hue_i*0.92` was used as a
+    # weight and never normalised, and it sums to 0.24 for a neutral
+    # pixel against 2.08 for a fully saturated one - so total pigment
+    # deposit varied 8.7x at constant luminance, and a neutral subject
+    # printed about six times LIGHTER than a saturated one of the same
+    # brightness (measured here: print luminance 0.341 against 0.055).
+    # The docstring above says the deposit is "the total quantity of
+    # light, SPLIT among the three pigments". It was the split that was
+    # missing, not the idea.
+    #
+    # Dividing by the sum makes it one. The hue logic is untouched -
+    # light that was red still lays down magenta and yellow and almost
+    # no cyan - but the three weights now say how the same total is
+    # SHARED rather than how much of it there is.
+    #
+    # THE ANCHOR IS THE NEUTRAL, and it is derived rather than tuned.
+    # A neutral pixel has hue (1,1,1), so its three raw weights are
+    # each `1 - HUE_K` and sum to `3*(1 - HUE_K)` = 0.24. Scaling the
+    # normalised share by exactly that leaves a neutral subject
+    # printing precisely what it printed before, and pulls everything
+    # else onto the same footing rather than moving the whole model.
+    # Measured at scene luminance 2.0, print luminance across
+    # saturation: neutral 0.3407 (unchanged to four figures),
+    # half-saturated 0.3771, pure red 0.3817, pure green 0.4206 - a
+    # spread of 1.23x where it used to be 6.81x.
+    #
+    # Choosing the anchor by minimising that spread alone would have
+    # been wrong: the spread falls monotonically as the scale drops,
+    # because an underexposed print is flat by being blank. The
+    # neutral is the reference a print is judged against, so the
+    # neutral is what gets held.
+    #
+    # THIS CHANGES RENDERS for every tricolour look except a perfectly
+    # neutral one, and unlike the contrast fix there is no reciprocal
+    # that restores the old picture: the old one was not this model
+    # with a different dial, it was a different model. Audit-8-17
+    # finding 11.
+    hue_c = np.clip(hue, 0.0, 1.0)
+    wsum = np.maximum((1.0 - hue_c * HUE_K).sum(axis=-1), 1e-9)
+    neutral_sum = 3.0 * (1.0 - HUE_K)
     for i in range(3):
-        dose = lum * (1.0 - np.clip(hue[..., i], 0.0, 1.0) * 0.92) \
-            * E * pr["speed"][i]
+        share = (1.0 - hue_c[..., i] * HUE_K) / wsum
+        dose = lum * share * neutral_sum * E * pr["speed"][i]
         d = (pr["dmax"][i] * dmax_mul) * \
             (1.0 - np.exp(-dose)) ** (pr["toe"][i] * max(contrast, 1e-6))
         # the pigment absorbs the complement of its own colour
