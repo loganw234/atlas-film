@@ -740,7 +740,27 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
     dose = np.maximum(dose, 0.0)
     # dose -> deposited substance. The exponential saturates on its own,
     # which is the shoulder; the toe exponent slows the start.
-    d = (pr["dmax"] * dmax_mul) * (1.0 - np.exp(-dose)) ** (pr["toe"] / contrast)
+    # CONTRAST NOW MEANS CONTRAST. `u = 1 - exp(-dose)` is in (0,1),
+    # so a SMALLER exponent compresses it toward 1: the old form
+    # divided the toe by the dial, which made a LARGER `contrast`
+    # SOFTEN the curve. Measured on platinum (dmax 1.30, toe 0.85),
+    # contrast index in dD per decade under the old form: 0.667 ->
+    # 1.251, 1.0 -> 1.007, 1.5 -> 0.794, 2.0 -> 0.662. The only way
+    # to steepen was to go below 1.0, on a slider centred at 1.0.
+    #
+    # It did lift a thin print - density rises everywhere under dmax -
+    # which is why it read as a cure; but it bought that by removing
+    # gradient, so the print went muddier rather than punchier. Every
+    # shipped look sat above 1.0 with a comment about fighting
+    # flatness, and was therefore softer than the default it was
+    # raised from.
+    #
+    # THIS CHANGES RENDERS, and the migration is exact: `toe/c` became
+    # `toe*c`, so a look authored at c reproduces at 1/c. Every value
+    # this repository ships has been converted. Anything held outside
+    # it - a saved shot, a stored recipe - needs the same reciprocal.
+    # Audit-8-17 finding 9.
+    d = (pr["dmax"] * dmax_mul) * (1.0 - np.exp(-dose)) ** (pr["toe"] * contrast)
     absorb = np.array(pr["absorb"], np.float32)
     if pigment or pr.get("pigment"):
         # a ground pigment absorbs the complement of its own colour
@@ -875,7 +895,7 @@ def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
         dose = lum * (1.0 - np.clip(hue[..., i], 0.0, 1.0) * 0.92) \
             * E * pr["speed"][i]
         d = (pr["dmax"][i] * dmax_mul) * \
-            (1.0 - np.exp(-dose)) ** (pr["toe"][i] / max(contrast, 1e-6))
+            (1.0 - np.exp(-dose)) ** (pr["toe"][i] * max(contrast, 1e-6))
         # the pigment absorbs the complement of its own colour
         absorb = 1.0 - _hex(pig[i]) * 0.92
         layer = np.power(10.0, -(d[..., None] * absorb))
