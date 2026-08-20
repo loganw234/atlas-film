@@ -1103,7 +1103,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
 
         diffraction -> halation -> [bloom] -> expose -> [solarise]
             -> process/paper/tricolour -> tone -> backdrop
-            -> grain -> sharpen
+            -> sharpen -> grain
 
     The first two act on the latent image, before there is a print to
     speak of: the lens forms the aerial image and the emulsion scatters
@@ -1208,7 +1208,23 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     if sharpen > 0:
         c = unsharp(c, sharpen, sharpen_radius)
     if grain > 0:
-        # strongest in the midtones, where film grain actually sits
+        # PAPER GRAIN, WHICH IS WHY IT COMES LAST. This is the texture
+        # of the sheet the print is on, not the negative's silver, so
+        # it sits on top of everything the darkroom did - sharpening
+        # included. The order above said "grain -> sharpen" while the
+        # code ran the other way, and the two are not interchangeable:
+        # unsharp is img + amount*(img - blur(img)), so sharpening
+        # AFTER grain would amplify it by roughly (1 + amount) at
+        # exactly grain's own frequency - the default grain_size of
+        # 2.0 px sits right where a radius-1 unsharp bites hardest
+        # (finding 38). The code was right and the docstring was not.
+        #
+        # The inline note here used to say "where film grain actually
+        # sits", which is the other model and the one that would want
+        # the other order. One dial cannot be both; the CLI calls it
+        # paper grain and that is what it is.
+        #
+        # strongest in the midtones, where grain actually reads
         lum = 0.299 * c[..., 0] + 0.587 * c[..., 1] + 0.114 * c[..., 2]
         mask = (1.0 - np.abs(2.0 * lum - 1.0))[..., None]
         g = _grain(c.shape, grain, grain_size)[..., None]
