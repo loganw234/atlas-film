@@ -679,8 +679,29 @@ def apply_palette(c, stops, mix=1.0):
 
 def unsharp(img, amount, radius_px):
     """Output sharpening: unsharp mask at print resolution. Apply last -
-    prints need more sharpening than any screen preview suggests."""
-    return np.clip(img + amount * (img - _blur(img, radius_px)), 0.0, 1.0)
+    prints need more sharpening than any screen preview suggests.
+
+    THE EXACT BLUR, not `_blur`. `_blur`'s small-sigma branch asks for
+    `int(sigma * 0.55)` box passes and then clamps that up to 1, so every
+    radius from 0 to 3.63 px produced the SAME radius-1 box and
+    `--sharpen-radius` did nothing at all across its entire useful range
+    (finding 90). Not a fraction of a pixel out - inert. At the 1.2
+    default the halo was 1.0 px where the dial asked for 0.46, better
+    than twice as wide as requested.
+
+    `_radius_for_sigma` inverts the box variance exactly and
+    `_boxn_frac` honours the fraction, which is what the diffraction
+    path has been doing since it hit the same wall. `_blur` itself is
+    left alone deliberately: bloom, halation and the backdrop run
+    through it at sigmas of tens of pixels, where its 3-level
+    quantisation is an approximation rather than an erasure, and moving
+    them would alter grades that were approved on what they look like.
+    Sharpening is the one consumer living entirely inside the dead zone.
+    """
+    r = _radius_for_sigma(float(radius_px))
+    if r <= 0.0:
+        return np.clip(img, 0.0, 1.0)
+    return np.clip(img + amount * (img - _boxn_frac(img, r, n=3)), 0.0, 1.0)
 
 
 # ---------------------------------------------------------------------
