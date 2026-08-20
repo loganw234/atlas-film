@@ -776,7 +776,15 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
     return (_hex(pr["base"]) * t).astype(np.float32)
 
 
-def solarise(neg, E, *, amount=0.8, fog=0.18, shield=8.0,
+# Beer-Lambert on an OPTICAL DENSITY. Density D transmits 10**-D, and
+# 10**-D is exp(-ln(10) * D), so the coefficient in the exponential is
+# ln(10) and not a number chosen by eye. The shipped 8.0 was 3.5x more
+# opaque than that, and what it bought was a second exposure that
+# reached almost nothing: see the note in `solarise`.
+SHIELD_LN10 = 2.302585
+
+
+def solarise(neg, E, *, amount=0.8, fog=1.5, shield=SHIELD_LN10,
              mackie=0.0, mackie_um=90.0, fmt=None):
     """The Sabattier effect: re-expose the print part-way through developing.
 
@@ -808,7 +816,48 @@ def solarise(neg, E, *, amount=0.8, fog=0.18, shield=8.0,
     d1 = 1.0 - np.exp(-np.maximum(neg, 0.0) * E)      # density so far, 0..1
     d = d1
     if amount > 0:
-        d = d1 + amount * fog * np.exp(-shield * d1)
+        # WHERE THE SCALE ACTUALLY TURNS OVER. Differentiating the line
+        # below, dd/dd1 = 1 - amount*fog*shield*exp(-shield*d1), so the
+        # curve descends wherever
+        #
+        #     amount * fog * shield * exp(-shield * d1) > 1
+        #
+        # which is d1 below ln(amount*fog*shield)/shield. The shipped
+        # defaults - amount .8, fog .18, shield 8 - put that product at
+        # 1.152, so a reversal existed over the darkest **1.8%** of the
+        # scale and nowhere else. Measured across 96 samples of a full
+        # ramp: one descending step. The effect was in the code and not
+        # in the print.
+        #
+        # Two numbers were wrong and they hid each other. `shield` is a
+        # Beer-Lambert coefficient on an optical density and therefore
+        # has to be ln(10); at 8.0 the second exposure was extinguished
+        # before it reached anything. And `fog` at 0.18 could add at
+        # most 0.18 of density to a clear area, against a scale running
+        # to 1.0 - far too little to turn it over even if it had
+        # reached. Correcting the coefficient alone makes it worse
+        # (product 0.332, no reversal at all); both together give a
+        # reversal across the bottom 26.5%, which is what the effect
+        # looks like on paper.
+        #
+        # Audit-8-17 finding 10. THIS CHANGES RENDERS: a solarised
+        # print made before this is not reproducible from the same
+        # dials, and the two shipped recipes were re-authored with it.
+        # THE SECOND EXPOSURE DEVELOPS WHAT IS STILL UNDEVELOPED, so
+        # the total is bounded by construction. The old form ADDED a
+        # density on top of an existing one with no ceiling, and went
+        # over full scale even at its own shipped fog of 0.18 (1.008
+        # at d1 = 0.993) - so the dense end was clipping in every
+        # solarised print this darkroom has ever made, and any fog
+        # large enough to actually reverse the scale drove it further.
+        # There is no additive fog that both reverses and stays in
+        # range: at d1 -> 1 the ceiling is breached for any fog > 0.
+        #
+        # Composing instead of adding fixes both at once. A fraction
+        # (1 - d1) of the emulsion is still undeveloped, the second
+        # exposure works on that, and the result cannot pass 1.
+        dose2 = amount * fog * np.exp(-shield * d1)
+        d = 1.0 - (1.0 - d1) * np.exp(-dose2)
     if mackie > 0:
         # developer exhaustion: what a point gains over its neighbourhood
         d = d + mackie * (d - blur_microns(d, mackie_um, fmt))
@@ -1042,7 +1091,8 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             process=None, proc_contrast=1.0, proc_dmax=1.0,
             tricolour=None, registration_um=0.0, pigments=None,
             fmt=None,
-            solar=0.0, solar_fog=0.18, solar_shield=8.0,
+            solar=0.0, solar_fog=1.5,
+            solar_shield=SHIELD_LN10,
             mackie=0.0, mackie_um=90.0,
             fstop=0.0, diffraction=0.0,
             halation_strength=0.0, halation_radius=140.0,
