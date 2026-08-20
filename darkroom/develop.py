@@ -1207,6 +1207,11 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
         if isinstance(stops, str):
             stops = [s.strip() for s in stops.split(",")]
         c = apply_palette(np.clip(c, 0.0, 1.0), stops, palette_mix)
+    # The transfer this stage is about to apply, named once because the
+    # backdrop below has to invert exactly the exponent that follows it
+    # - a paper or process render flips it, and pre-compensating by the
+    # wrong one of the two would be worse than not compensating at all.
+    xfer = 1.0 / gamma if (paper or process or tricolour) else gamma
     if bg_kind:
         stops = bg_stops or [bg_a, bg_b]
         if isinstance(stops, str):
@@ -1215,9 +1220,23 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             stops = [bg_a, bg_b]
         bg = _backdrop(c.shape, bg_kind, stops, bg_angle,
                        bg_center, bg_strength)
+        # PRE-COMPENSATED, because the transfer is still to come. The
+        # screen below happens BEFORE `_par_clip_pow`, so a stop read
+        # off a colour picker used to print as stop**gamma: at the
+        # default 0.82 the README's own `--bg-stops "#05050a,..."` came
+        # out #0a0a12, and the built-in #0c0c12 came out #15151d - every
+        # backdrop roughly a stop lighter than the one asked for
+        # (finding 91). Raising it by the inverse exponent first means
+        # the backdrop lands on exactly its own hex wherever the render
+        # contributes nothing, which is the whole of what a backdrop is
+        # for. This is not a debatable convention inside this function,
+        # because the OTHER hex dial here - tone_curve's split_lo and
+        # split_hi - is applied after the transfer and has always been
+        # honoured in display space. One of the two was in the wrong
+        # space, and it was the one whose values a user picks by eye.
+        bg = np.clip(bg, 0.0, 1.0) ** (1.0 / xfer)
         c = bg + c - bg * c                        # screen: light on backdrop
-    c = _par_clip_pow(c, (1.0 / gamma if (paper or process or tricolour)
-                          else gamma))
+    c = _par_clip_pow(c, xfer)
     if vignette > 0:
         h, w = c.shape[:2]
         yy, xx = np.mgrid[0:h, 0:w]
