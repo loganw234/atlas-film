@@ -571,10 +571,18 @@ def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None):
     out = np.empty_like(neg)
 
     def channel(ch):
-        # 1.22*lambda*N is the first zero; the gaussian that best fits an
-        # Airy disk has sigma about 0.42 of it, which is the number to
-        # blur by
-        sigma_um = 0.42 * 1.22 * LAMBDA_UM[ch] * float(fstop) * amount
+        # THE 0.42 ALREADY CONTAINS THE 1.22. The gaussian that best
+        # fits an Airy disk has sigma ~= 0.42*lambda*N - equivalently
+        # 0.21*lambda/NA - which is about 0.34 of the first-zero
+        # radius, not 0.42 of it. Multiplying by 1.22 as well applied
+        # the Rayleigh constant twice and softened every stopped-down
+        # frame by 1.218x: f/64 green came out at 18.0 um against a
+        # physical 14.8. Fitting it three ways gives 0.421 (2D
+        # area-weighted), 0.425 (1D) and 0.437 (FWHM-matched); every
+        # convention lands near 0.42 and none near 0.51. The CLI
+        # promises --diffraction 1.0 is physically exact, and the
+        # book's figures are all rendered at exactly that.
+        sigma_um = 0.42 * LAMBDA_UM[ch] * float(fstop) * amount
 
         def run():
             out[..., ch] = blur_microns(neg[..., ch:ch+1], sigma_um,
@@ -933,7 +941,7 @@ def _shift(img, dx, dy, fill=1.0):
 
 
 def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
-                    dmax_mul=1.0, registration_um=0.0):
+                    dmax_mul=1.0, registration_um=0.0, fmt=None):
     """Separate through red, green and blue; print three pigment layers.
 
     We hold full colour data, so the separations are honest: the red
@@ -957,12 +965,21 @@ def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
     a different direction per layer - three plates were printed in three
     passes and never landed perfectly, and that near-miss is most of why
     the real thing looks the way it does.
+
+    IT TAKES `fmt` FOR THE SAME REASON EVERY OTHER MICRON-SIZED STAGE
+    DOES. It did not, so the offset was always converted against the
+    4x5 sheet: a 70 um misregistration on a 35mm negative landed as
+    17.5 um worth of pixels, and on a phone format as 4. _pitch_um's
+    own docstring lists tricolour registration among the stages the
+    unit system exists to keep invariant, and diffraction, halation
+    and the Mackie blur all receive it - this was the one that did
+    not, so it was the one that broke the promise.
     """
     pr = TRICOLOUR[name]
     pig = pigments or pr["pigments"]
     base = _hex(pr["base"])
     t = np.ones_like(neg)
-    px = (registration_um / _pitch_um(neg.shape[1], neg.shape[0])
+    px = (registration_um / _pitch_um(neg.shape[1], neg.shape[0], fmt)
           if registration_um else 0.0)
     neg = np.maximum(neg, 0.0)
     # how much light there was, and what colour it was
@@ -1176,7 +1193,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
         c = tricolour_print(neg, E * ink_density, tricolour,
                             pigments=pigments, contrast=proc_contrast,
                             dmax_mul=proc_dmax,
-                            registration_um=registration_um)
+                            registration_um=registration_um, fmt=fmt)
         if shadow > 0:
             base = _hex(TRICOLOUR[tricolour]["base"])
             sh = shadow_field(np.clip(c / np.maximum(base, 1e-6), 0, 1),
