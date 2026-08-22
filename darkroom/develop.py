@@ -177,7 +177,23 @@ def _par_clip32(c):
 
 
 def _hex(c):
-    c = c.lstrip("#")
+    """A colour a person typed, in either length CSS allows.
+
+    Three-digit shorthand used to raise deep inside numpy: the slices
+    (0,2,4) on "#123" give "12", "3" and "", and int("", 16) is a
+    ValueError with nothing in the message about hex stops. The root
+    CLI's own help for --bg-stops documents "#000,#123,#fff" as the
+    example, so following the documentation was the way to hit it -
+    and the same parser reads --ink, --split-lo/hi and every custom
+    tone stop.
+    """
+    c = c.lstrip("#").strip()
+    if len(c) == 3:
+        c = "".join(ch * 2 for ch in c)
+    if len(c) != 6:
+        raise ValueError(
+            f"{c!r} is not a colour: hex stops are three or six "
+            f"digits, like #123 or #8a5c34")
     return np.array([int(c[i:i + 2], 16) / 255.0 for i in (0, 2, 4)], np.float32)
 
 
@@ -280,10 +296,20 @@ def _boxn(img, r, n=3):
                                 axis=axis)
             hi = np.minimum(np.arange(m) + r + 1, m)
             lo = np.maximum(np.arange(m) - r, 0)
+            # THE DIVISOR IS float32, as _boxn_frac's already was.
+            # Dividing a float32 image by an intp array promotes the
+            # whole result to float64 under NumPy 2 - so every pass at
+            # radius 15 or more materialised a full-image float64
+            # array, doubling peak memory on a print measured in
+            # gigabytes, and the function's output dtype flipped
+            # across the r=14 threshold between the direct and prefix
+            # paths. Its sibling casts here deliberately; this one
+            # was the copy that did not.
             out = ((np.take(cs, hi, axis=axis)
                     - np.take(cs, lo, axis=axis))
-                   / (hi - lo).reshape([-1 if a == axis else 1
-                                        for a in range(out.ndim)]))
+                   / (hi - lo).astype(np.float32)
+                   .reshape([-1 if a == axis else 1
+                             for a in range(out.ndim)]))
     return out
 
 
@@ -311,7 +337,18 @@ def _boxn_frac(img, r, n=3):
         return img
     r0 = int(r)
     frac = r - r0
-    if frac < 1e-6:
+    if frac < 1e-6 and r0 <= DIRECT_BOX_MAX_R:
+        # A WHOLE-PIXEL RADIUS IS STILL AN OPTICAL RADIUS. Delegating
+        # to _boxn handed it _boxn's threshold of 14 rather than this
+        # function's 32, so an almost-exactly-integer optics radius
+        # between them took the prefix-sum path that
+        # DIRECT_BOX_MAX_R_EXACT exists to refuse - and the comment
+        # below names the case, a 48x72 in sheet asking for 24.7. The
+        # discontinuity is real and only at integers: measured on a
+        # 14400-px row, r=20 carried 5.5e-06 max error against 3.6e-08
+        # at r=20+1e-5, a 150x step across a hair's width of radius.
+        # Above 14 it falls through to the exact loop below, which
+        # handles frac=0 correctly as a plain whole-pixel box.
         return _boxn(img, r0, n)
     out = img
     for _ in range(n):
@@ -486,11 +523,23 @@ def _radius_for_sigma(sigma_px, n=3, tol=1e-6):
 
     Needed because a FRACTIONAL box is not a narrow kernel: its side taps
     sit at plus and minus one whole pixel no matter how small the radius,
-    only their weight shrinks. So the usual `radius = 0.55 * sigma` rule,
-    which is calibrated for whole-pixel boxes, badly over-blurs below a
-    pixel - measured at f/64 on a 900px sheet, it widened an edge by 89
-    microns where the aperture calls for 43. Solving for the variance
-    directly is exact at every scale and costs one scalar bisection.
+    only their weight shrinks. So the usual `radius = 0.55 * sigma` rule
+    badly over-blurs below a pixel - measured at f/64 on a 900px sheet,
+    it widened an edge by 89 microns where the aperture calls for 43.
+    Solving for the variance directly is exact at every scale and costs
+    one scalar bisection.
+
+    THE 0.55 RULE IS NOT "CALIBRATED FOR WHOLE-PIXEL BOXES" EITHER, and
+    this docstring used to say it was. By _box_variance directly above,
+    three whole-pixel boxes of half-width r have standard deviation
+    sqrt(r(r+1)), so matching a gaussian needs r about sigma - 0.5, not
+    0.55*sigma. Measured with an impulse, `_blur`'s 0.55 rule delivers
+    53-61% of the sigma asked for: 8, 16 and 40 px come back as 4.5,
+    8.5 and 22.5. `_blur` keeps that behaviour on purpose - bloom,
+    sharpening and the backdrop all run through it and every approved
+    grade was judged against it - but the claim that the rule is
+    calibrated was simply wrong, and a wrong reason is worse than a
+    frozen number, because the next person reads it as licence.
     """
     want = sigma_px * sigma_px
     if want <= 0:
@@ -667,8 +716,15 @@ def _grain(shape, amount, size, seed=7):
     size = max(float(size), 1.0)
     gh, gw = max(1, int(h / size)), max(1, int(w / size))
     n = rng.random((gh, gw), dtype=np.float32)
-    n = np.repeat(np.repeat(n, int(np.ceil(h / gh)), 0),
-                  int(np.ceil(w / gw)), 1)[:h, :w]
+    # UPSAMPLED BY INDEX, not by a whole-number repeat. Repeating each
+    # cell ceil(dim/cells) times rounds the cell size UP for a whole
+    # axis whenever the dimension is not an exact multiple - so at
+    # --grain-size 2 a 1440-row frame got 2x2 cells and a 1439-row
+    # frame got 3x2, grain half again as tall as it is wide from a
+    # one-pixel change in height. Mapping each output row and column
+    # back into the grid keeps the cell at dim/cells on both axes,
+    # which is what the dial says it is.
+    n = n[(np.arange(h) * gh // h)][:, (np.arange(w) * gw // w)]
     n = _blur(n[..., None], max(size * 0.5, 1.0))[..., 0]
     n -= n.mean()
     peak = max(float(np.abs(n).max()), 1e-6)
