@@ -675,14 +675,48 @@ def _grain(shape, amount, size, seed=7):
     return (n / peak * amount).astype(np.float32)
 
 
-def apply_palette(c, stops, mix=1.0):
-    """Gradient-map toning: map display luminance through color stops."""
-    lum = 0.299 * c[..., 0] + 0.587 * c[..., 1] + 0.114 * c[..., 2]
+def apply_palette(c, stops, mix=1.0, xfer=1.0):
+    """Gradient-map toning: map display luminance through color stops.
+
+    `xfer` IS THE TRANSFER STILL TO COME, and without it this function
+    did not do what its own first line says. It ran on the LINEAR
+    working image, in the middle of develop(), with `_par_clip_pow`
+    still ahead of it - so all three of its parts were in the wrong
+    space at once:
+
+      - `lum` indexed the gradient by linear luminance, not display,
+        so a midtone stop landed off its own position;
+      - the stop colours are hex a user picked BY EYE, i.e. display
+        values, and were handed back to be raised to xfer;
+      - and `mix` blended those display colours into a linear image,
+        which is two different spaces averaged together.
+
+    The visible half is the second. A stop printed as hex**0.82 on the
+    plain path and hex**(1/0.82) on a paper or process path - lighter
+    one way, darker the other, the SAME named tone rendering two ways
+    depending on a branch the palette knows nothing about. The sepia
+    mid stop #8a5c34 came out ~#9a6f45 or ~#794a25 and never itself.
+
+    This is the same defect as finding 91, one dial over: the backdrop
+    below carries a comment saying it is "not a debatable convention
+    inside this function, because the OTHER hex dial here - tone_curve's
+    split_lo and split_hi - is applied after the transfer and has always
+    been honoured in display space." There were three hex dials, not
+    two, and the third was still in the wrong space.
+
+    Fixed by doing the whole operation in display space and returning
+    to linear, rather than by moving the stage: the backdrop is
+    screened on AFTER this, and a palette applied later would tone the
+    backdrop too - a separate decision, and not this finding's to make.
+    """
+    d = c if xfer == 1.0 else _par_clip_pow(c, xfer)
+    lum = 0.299 * d[..., 0] + 0.587 * d[..., 1] + 0.114 * d[..., 2]
     xs = np.linspace(0.0, 1.0, len(stops))
     cols = np.stack([_hex(s) for s in stops])
     mapped = np.stack([np.interp(lum, xs, cols[:, ch]) for ch in range(3)],
                       axis=-1).astype(np.float32)
-    return c + (mapped - c) * mix
+    out = d + (mapped - d) * mix
+    return out if xfer == 1.0 else _par_clip_pow(out, 1.0 / xfer)
 
 
 def unsharp(img, amount, radius_px):
@@ -1218,17 +1252,21 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     else:
         c = _par_expose(neg, E)
     c = _par_saturate(c, saturation)
+    # The transfer this stage is about to apply, named once because
+    # BOTH hex dials below have to know it: the backdrop inverts it so
+    # its stop lands on its own value, and the palette needs it to work
+    # in display space at all. A paper or process render flips it, and
+    # using the wrong one of the two would be worse than using neither.
+    # Named here rather than after the palette because the palette is
+    # the caller that was missing it.
+    xfer = 1.0 / gamma if (paper or process or tricolour) else gamma
     if palette:
         stops = TONES.get(palette) if isinstance(palette, str) and \
             palette in TONES else palette
         if isinstance(stops, str):
             stops = [s.strip() for s in stops.split(",")]
-        c = apply_palette(np.clip(c, 0.0, 1.0), stops, palette_mix)
-    # The transfer this stage is about to apply, named once because the
-    # backdrop below has to invert exactly the exponent that follows it
-    # - a paper or process render flips it, and pre-compensating by the
-    # wrong one of the two would be worse than not compensating at all.
-    xfer = 1.0 / gamma if (paper or process or tricolour) else gamma
+        c = apply_palette(np.clip(c, 0.0, 1.0), stops, palette_mix,
+                          xfer)
     if bg_kind:
         stops = bg_stops or [bg_a, bg_b]
         if isinstance(stops, str):
