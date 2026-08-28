@@ -558,6 +558,20 @@ def _radius_for_sigma(sigma_px, n=3, tol=1e-6):
     return 0.5 * (lo + hi)
 
 
+def _convolve_psf(img, kern):
+    """Same-size FFT convolution with a small normalised kernel.
+    numpy only, because develop's floor is numpy: scipy is an
+    agent extra and the print path must not grow a dependency
+    for one stage."""
+    kh, kw = kern.shape
+    ph, pw = img.shape[0] + kh - 1, img.shape[1] + kw - 1
+    F = np.fft.rfft2(img, s=(ph, pw))
+    K = np.fft.rfft2(kern, s=(ph, pw))
+    full = np.fft.irfft2(F * K, s=(ph, pw))
+    y0, x0 = (kh - 1) // 2, (kw - 1) // 2
+    return full[y0:y0 + img.shape[0], x0:x0 + img.shape[1]]
+
+
 def blur_microns(img, sigma_um, fmt=None):
     """Gaussian-ish blur of a width measured on the SHEET, not on the file.
 
@@ -603,7 +617,9 @@ def blur_microns(img, sigma_um, fmt=None):
     return _boxn_frac(img, _radius_for_sigma(px), n=3)
 
 
-def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None):
+def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None,
+                     blades=0.0, blade_curve=0.0, blade_rot=0.0,
+                     traced=False):
     """Soften by the diffraction limit of the aperture actually used.
 
     The Airy disk's first zero sits at 1.22*lambda*N. At f/64 and green
@@ -617,6 +633,30 @@ def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None):
     """
     if not fstop or amount <= 0:
         return neg
+    # THE IRIS'S OWN DIFFRACTION, on the traced path. A bladed
+    # aperture does not blur to an Airy disc; it puts the polygon's
+    # transform through every bright point - the starburst. The
+    # kernel comes from atlas-optical at the print's own micron
+    # pitch, and where the pitch cannot resolve it (a proof), or
+    # the sibling package is absent, the Airy path below stands -
+    # a declared fallback, not a silent one, per docs/mk3-optics.md.
+    if traced and blades >= 3.0:
+        try:
+            from atlas_optical import iris as _iris
+        except ImportError:
+            _iris = None
+        if _iris is not None:
+            pitch = _pitch_um(neg.shape[1], neg.shape[0], fmt)
+            kerns = [_iris.iris_psf(blades, blade_curve, blade_rot,
+                                    float(fstop) * max(amount, 1e-6),
+                                    LAMBDA_UM[ch], pitch)
+                     for ch in range(3)]
+            if all(k is not None for k in kerns):
+                out = np.empty_like(neg)
+                for ch in range(3):
+                    out[..., ch] = _convolve_psf(neg[..., ch],
+                                                 kerns[ch])
+                return out
     out = np.empty_like(neg)
 
     def channel(ch):
@@ -1223,6 +1263,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             solar_shield=SHIELD_LN10,
             mackie=0.0, mackie_um=90.0,
             fstop=0.0, diffraction=0.0,
+            blades=0.0, blade_curve=0.0, blade_rot=0.0, traced=False,
             halation_strength=0.0, halation_radius=140.0,
             shadow=0.0, shadow_radius=0.02,
             shoulder=0.0, split=0.0,
@@ -1263,7 +1304,9 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             f"is what you meant.", RuntimeWarning, stacklevel=2)
     # the lens, then the emulsion - both before anything is developed
     if diffraction > 0 and fstop:
-        neg = diffraction_blur(neg, fstop, amount=diffraction, fmt=fmt)
+        neg = diffraction_blur(neg, fstop, amount=diffraction, fmt=fmt,
+                               blades=blades, blade_curve=blade_curve,
+                               blade_rot=blade_rot, traced=traced)
     if halation_strength > 0:
         neg = halation(neg, strength=halation_strength,
                        radius_um=halation_radius, fmt=fmt)
