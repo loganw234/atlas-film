@@ -16,3 +16,19 @@ test = ["pytest"]
 
 [tool.setuptools]
 packages = ["atlas_film"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# The darkroom's lint contract, carried across the seam verbatim:
+# CORRECTNESS, NOT STYLE. The wide default set objects to this
+# codebase's deliberate house idiom (dict() tables, import spacing);
+# a linter that has to be argued with every commit gets turned off,
+# so this selects the rules that can find a real fault and leaves
+# the taste to the author.
+select = ["F", "E9", "BLE001", "RUF100", "B904", "B002", "B006"]
+
+[tool.ruff.lint.per-file-ignores]
+# tests reach into private helpers on purpose
+"tests/*" = ["F401"]
