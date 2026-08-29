@@ -1,18 +1,17 @@
 """The historic processes: dose to deposit to density, sourced.
 
-Carved verbatim from the darkroom's develop monolith on
-2026-08-28 (the extraction is a text change with no licence to
-touch a number). The constants carry the standing findings of the
-darkroom's optics-film-process dossier ON PURPOSE: platinum's
-dmax 1.30 is contradicted (~1.45 in Ware's own measurements, three
-page-pinned statements), the salt/albumen scale ordering is
-inverted against Reilly and Ware both, and the pigment absorb
-0.88 below has drifted from its sibling HUE_K = 0.92 against the
-constant's own comment contract. The reconciliation organ fixes
-these as a JOINT fit against Ware's tables - the dossier proved a
-one-number edit worsens the exposure-scale overshoot - and until
-then the numbers ship exactly as the darkroom shipped them, with
-this paragraph as the ledger entry.
+Carved verbatim from the darkroom's develop monolith on 2026-08-28;
+RECONCILED against the optics-film-process dossier's round-2 verdict
+table the same day, as the joint fit the dossier demanded (raising
+platinum's dmax alone worsened the scale overshoot 2.107 -> 2.164,
+so dmax and toe moved together). The referee is
+`atlas_film/sensitometry.py` - Ware's own exposure-range convention
+read off this module's actual prints - and the fit's tests were
+watched failing at the shipped values before a constant moved
+(`tests/test_the_processes_answer_to_ware.py` carries the record).
+What no source licenses stays put: vandyke, albumen, salt and gum
+dmax are wanted, not invented, and every remaining absence is the
+medium ledger's (`atlas-darkroom/docs/film-extraction.md`).
 """
 
 import numpy as np
@@ -52,12 +51,33 @@ PROCESSES = {
     # silver in a ferric process - warm brown, so blue is taken out
     "vandyke":   dict(dmax=1.50, toe=1.15, speed=1.10,
                       absorb=(0.72, 0.92, 1.00), base="#f4ecdc"),
-    # platinum metal in the fibre: a famously long straight scale, low
-    # toe, and a modest dmax - the reason platinotypes look luminous
-    "platinum":  dict(dmax=1.30, toe=0.85, speed=0.90,
+    # platinum metal in the fibre - the reason platinotypes look
+    # luminous. Reconciled 2026-08-28 to Ware's own densitometry pair
+    # (Platinomicon: Dmax "~1.45" p. 235, "1.40-1.45" on Western paper
+    # p. 188, Klimek's 1.42 p. 186; exposure scale ~1.9 p. 235, his
+    # Table 7.1 band 1.5-1.8 at p. 158): dmax was 1.30, contradicted-
+    # low, and toe 0.85 read scale 2.107 - inside his PALLADIUM band
+    # (2.0-2.4). The pair moved JOINTLY because dmax 1.45 alone reads
+    # 2.164; toe 1.01 solves the scale to 1.90 measured. "A famously
+    # long straight scale" was this comment's old claim - true against
+    # silver-gelatin enlarging papers, false against palladium, and
+    # the third measured number (gamma ~0.96) is the one this
+    # single-exponent curve cannot also hit; the dossier carries both.
+    "platinum":  dict(dmax=1.45, toe=1.01, speed=0.90,
                       absorb=(0.95, 0.97, 1.00), base="#f1ece0"),
-    # silver chloride printed out: reddish through to mauve, short dmax
-    "salt":      dict(dmax=1.20, toe=1.25, speed=0.85,
+    # silver chloride printed out: reddish through to mauve. Scale
+    # reconciled 2026-08-28: Reilly (ch. 7, reporting Hubl) has plain
+    # salted paper the longest-scaled of its family, and Ware sorts it
+    # into his long-range class BESIDE platinum-palladium (Cyanomicon
+    # pp. 213, 219) - the shipped toe 1.25 read 1.568, SHORTER than
+    # albumen's 1.741, inverted against both primaries. toe 0.95
+    # gives salt its classmate's measured scale (1.90); class
+    # membership is the only numeric content the sources offer, since
+    # Ware's 2-2.4 is a negative range and this curve maps scene to
+    # print. dmax 1.20 stays: the one measurement in hand (koraks
+    # 2023, 1.35) is a gold-toned print and non-archival - abstention
+    # over invention.
+    "salt":      dict(dmax=1.20, toe=0.95, speed=0.85,
                       absorb=(0.66, 0.94, 1.00), base="#f3e8d4"),
     # albumen sits on the surface rather than in it, so it goes deeper
     "albumen":   dict(dmax=1.70, toe=1.20, speed=1.00,
