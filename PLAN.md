@@ -51,6 +51,23 @@ the literature through the darkroom's sources program, then the organ
 - a density-correlated noise field applied to the negative's own
 measure, with the microdensitometer test as the gate.
 
+*Landed 2026-08-28, down to the particle. The film-grain dossier
+(darkroom `docs/sources/dossiers/film-grain.md`, 53 entries in four
+lanes - the local Ware monographs plus three research sweeps) put a
+measured or class-median particle under every process, and the organ
+is Nutting-both-ways: `process_print(grain=True, pitch_um=..)` draws
+each pixel's particle count Poisson about the coverage mean and
+converts it back through the same relation, so the mean is exact,
+sigma_D = sqrt(kappa*a*D/A) with no dial, and Selwyn's invariant
+holds by construction (`atlas_film/granularity.py` is the
+microdensitometer that checks all of it off actual prints). The
+orderings are predictions now: platinum smooth because Ravines
+measured 15-25 nm, gum visibly grainy because pigment aggregates are
+microns, salt grainless because photolytic silver is nanoparticle.
+Declared open: POP's size-with-count coupling (Reilly's TEM),
+size distributions and the linear-vs-sqrt(D) tension, toning
+geometry, tricolour-layer grain.*
+
 ## 3. Reciprocity failure
 
 The negative already records its shutter; long exposures on real
