@@ -38,6 +38,23 @@ def _hex(c):
     return np.array([int(c[i:i + 2], 16) / 255.0 for i in (0, 2, 4)], np.float32)
 
 
+# HOW COMPLETELY A COLOUR SPARES ITS OWN BAND. One number with two
+# duties: the tricolour split weighs each layer by `1 - hue*HUE_K`,
+# and the pigment-absorb lines - process_print's below and the
+# tricolour's - darken by `1 - colour*HUE_K`, both statements that a
+# saturated colour is not QUITE transparent to itself. The name was
+# coined "because two places need the same number and one of them is
+# a calibration that has to follow if it moves" - and the calibration
+# did not follow: this module's line drifted to a literal 0.88
+# against 0.92 (the darkroom's findings queue #15; inventory OPT-G7
+# records the site at 0.92, so the drift postdates the survey).
+# Reconciled 2026-08-28: the constant lives here, up the import
+# direction the package already has, both sites read the name, and
+# pigments re-exports it. A comment saying "has to follow" is a
+# hope; an import is a mechanism.
+HUE_K = 0.92
+
+
 #
 #   dmax   reflection density the process can reach - how black its black
 #   toe    shadow compression; above 1 the deposit starts slowly
@@ -132,6 +149,6 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0):
     absorb = np.array(pr["absorb"], np.float32)
     if pigment or pr.get("pigment"):
         # a ground pigment absorbs the complement of its own colour
-        absorb = 1.0 - _hex(pigment or pr["pigment"]) * 0.88
+        absorb = 1.0 - _hex(pigment or pr["pigment"]) * HUE_K
     t = np.power(10.0, -(d[..., None] * absorb))       # optical density
     return (_hex(pr["base"]) * t).astype(np.float32)

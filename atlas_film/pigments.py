@@ -10,14 +10,14 @@ to the digit - the film golden record holds them there.
 
 import numpy as np
 
-from atlas_film.processes import _hex
-
-
-# A neutral pixel carries 1 - HUE_K in every layer, and that is
-# also the anchor the tricolour split is scaled to - see
-# tricolour_print. Named because two places need the same number
-# and one of them is a calibration that has to follow if it moves.
-HUE_K = 0.92
+# HUE_K is defined in atlas_film.processes since the reconciliation:
+# the pigment-absorb calibration there and the hue split here are one
+# number, the pair drifted once (0.88 against 0.92, findings queue
+# #15), and the definition now sits beside the site that drifted.
+# Re-exported here so every consumer keeps its handle; a neutral
+# pixel still carries 1 - HUE_K in every layer, and the split is
+# still anchored to 3*(1 - HUE_K) - see tricolour_print.
+from atlas_film.processes import HUE_K, _hex
 
 
 TRICOLOUR = {
@@ -155,7 +155,7 @@ def tricolour_print(neg, E, name="carbro", *, pigments=None, contrast=1.0,
         d = (pr["dmax"][i] * dmax_mul) * \
             (1.0 - np.exp(-dose)) ** (pr["toe"][i] * max(contrast, 1e-6))
         # the pigment absorbs the complement of its own colour
-        absorb = 1.0 - _hex(pig[i]) * 0.92
+        absorb = 1.0 - _hex(pig[i]) * HUE_K
         layer = np.power(10.0, -(d[..., None] * absorb))
         if px:
             ang = i * (2.0 * np.pi / 3.0)

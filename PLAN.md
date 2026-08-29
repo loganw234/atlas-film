@@ -26,6 +26,21 @@ landed as breaking-latitude corrections with the film golden rows
 re-baked, named. Vandyke/albumen/salt/gum dmax stay as wanted
 sources; abstention is not invention.
 
+*Landed 2026-08-28, two named commits. The referee
+(`atlas_film/sensitometry.py`) reads Ware's own convention off
+`process_print`'s actual prints, reproduced the dossier's independent
+column to +/-0.004, and was watched failing before any constant
+moved. The joint fit: platinum dmax 1.30 -> 1.45 with toe 0.85 ->
+1.01 (reads Dmax 1.450 / scale 1.902 against Ware's measured ~1.45 /
+~1.9), salt toe 1.25 -> 0.95 (prints its classmate's 1.90, above
+albumen's 1.741 - the inversion undone). The absorb pair: HUE_K moved
+to processes.py, both absorb lines read the name, 0.88 landed back on
+the recorded 0.92. Golden rows re-baked darkroom-side with the whys
+riding (`process:platinum`, `process:salt`, then the pigment-path
+rows). Still open and wanted: the four unsourced dmax constants, and
+gamma - the third measured number a single-exponent curve cannot hit
+while holding Dmax and scale.*
+
 ## 2. Film grain
 
 The ledger's oldest parked row. Emulsion grain is a counting

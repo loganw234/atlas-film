@@ -14,21 +14,24 @@ platinum/palladium *Platinomicon*, freely published at mikeware.co.uk
 — by the darkroom's external-sources program
 (`atlas-darkroom/docs/sources/dossiers/optics-film-process.md`).
 
-That audit is carried here honestly rather than silently: **the
-shipped platinum dmax of 1.30 is contradicted by Ware's own measured
-~1.45** (three page-pinned statements), the salt-versus-albumen tonal
-ordering is inverted against both Ware and Reilly, and the shipped
-"platinum" curve evaluates into Ware's *palladium* exposure-range
-band. These are the reconciliation organ's to fix — as a joint fit of
-dmax and toe against Ware's tables, because the dossier proved a
-one-number edit worsens the exposure-scale overshoot — and until that
-organ lands, the constants ship exactly as the darkroom shipped them,
-with the findings stated where the numbers live
-(`atlas_film/processes.py`).
+That audit found the shipped platinum dmax 1.30 contradicted by
+Ware's own measured ~1.45 (three page-pinned statements), the
+salt-versus-albumen tonal ordering inverted against both Ware and
+Reilly, and the shipped "platinum" curve evaluating into Ware's
+*palladium* exposure-range band. **The reconciliation organ closed
+all three on 2026-08-28** as the joint fit the dossier demanded — a
+one-number edit provably worsened the exposure-scale overshoot —
+refereed by `atlas_film/sensitometry.py` (Ware's own convention, read
+off this package's actual prints, watched failing first). Platinum
+now prints his densitometry pair (Dmax 1.450, scale 1.902); salt
+prints beside platinum-palladium, the class Ware put it in, above
+albumen as both primaries order it. The derivations and page numbers
+live where the numbers live (`atlas_film/processes.py`).
 
 Vandyke, albumen, salt and gum dmax remain unsourced (Ware's
 monographs are exhausted as a route to those four); they are wanted,
-not hidden.
+not hidden. So is gamma: Ware measured three numbers per sensitizer,
+and a single-exponent curve holds two.
 
 ## James Reilly — the albumen and salted-paper literature
 
