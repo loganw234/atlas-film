@@ -31,7 +31,10 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-develop = pytest.importorskip("darkroom.develop")
+# the models live in atlas_film since the extraction; the handle
+# keeps its old name so the measurements below stay verbatim
+develop = pytest.importorskip("atlas_film.processes")
+pigments = pytest.importorskip("atlas_film.pigments")
 
 
 def curve(contrast, n=256):
@@ -107,7 +110,7 @@ def test_tricolour_moves_the_same_way():
     neg = np.stack([dose, dose, dose], -1)[None, :, :]
 
     def idx(c):
-        out = np.asarray(develop.tricolour_print(
+        out = np.asarray(pigments.tricolour_print(
             neg, 1.0, "carbro", contrast=c), np.float64)[0, :, 0]
         return float(np.max(np.abs(np.gradient(
             out, np.log10(np.geomspace(0.01, 10.0, len(out)))))))

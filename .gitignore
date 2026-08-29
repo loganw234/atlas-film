@@ -1,0 +1,15 @@
+# Machine-local data stays machine-local: the glass catalogues and any
+# scraped compilations live here on a bench and are never committed.
+# The two committed files are the verified numbers with their own
+# provenance, kept in git because the independence tests compare
+# against them.
+data/*
+!data/dioptrique.json
+!data/registry-census.json
+
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/

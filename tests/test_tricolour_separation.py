@@ -36,7 +36,9 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-develop = pytest.importorskip("darkroom.develop")
+# the model lives in atlas_film since the extraction; the handle
+# keeps its old name so the measurements below stay verbatim
+develop = pytest.importorskip("atlas_film.pigments")
 
 LUM = (0.299, 0.587, 0.114)
 
@@ -120,9 +122,11 @@ def test_the_anchor_is_derived_from_the_constant_not_typed():
     """If HUE_K moves, the calibration has to move with it. A literal
     0.24 sitting beside a 0.92 is a trap for whoever tunes the
     pigment response next."""
-    src = (ROOT / "darkroom" / "develop.py").read_text(encoding="utf-8")
+    src = (ROOT / "atlas_film" / "pigments.py").read_text(encoding="utf-8")
     body = src[src.index("def tricolour_print"):]
-    body = body[:body.index("\ndef ")]
+    nxt = body.find("\ndef ")
+    if nxt != -1:                # it is the module's last def today
+        body = body[:nxt]
     assert "3.0 * (1.0 - HUE_K)" in body, \
         "the neutral anchor is no longer derived from HUE_K"
     # CODE lines only. The prose above the deposit quotes 0.24 as the
