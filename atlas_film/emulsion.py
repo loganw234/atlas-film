@@ -175,6 +175,12 @@ def coat(n_cells, ceiling, grain_um2, pitch_um, seed, label=""):
     _check_floor(grain_um2, pitch_um, label)
     area = float(pitch_um) ** 2
     lam_k = float(ceiling) * area / (_kappa() * float(grain_um2))
+    if lam_k + 8.0 * np.sqrt(lam_k) + 16.0 > EXACT_KMAX:
+        raise ValueError(
+            f"{lam_k:.0f} crystals per cell is the aggregate regime: "
+            "a stored stock would not match the normal-quantile path "
+            "expose() uses there - coat at a resolved pitch, nearer "
+            "the crystal")
     seeds = _band_seeds(seed, (n_cells + BAND - 1) // BAND)
     Ks, thrs, kmax = [], [], 0
     for i, s in enumerate(seeds):

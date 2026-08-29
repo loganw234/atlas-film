@@ -176,7 +176,7 @@ PROCESSES = {
 
 
 def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0,
-                  grain=False, pitch_um=None, seed=0):
+                  grain=False, pitch_um=None, seed=0, sheet=None):
     """Expose, develop and read a print in one of the historic processes.
 
     `grain=True` prints on a SHEET (atlas_film.emulsion): the seed
@@ -269,8 +269,21 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0,
         ceiling = float(pr["dmax"] * dmax_mul)
         frac = (1.0 - np.exp(-dose.astype(np.float64))) \
             ** (pr["toe"] * contrast)
-        n = emulsion.expose(frac, ceiling, pr["grain_um2"],
-                            float(pitch_um), seed, label=name)
+        if sheet is not None:
+            # a coated stock: the sheet already exists as data, and
+            # printing on it is develop_on's pure comparison - the
+            # seed is unused because the stock IS the identity
+            K, thr = sheet
+            if K.shape[0] != frac.size:
+                raise ValueError(
+                    f"this sheet holds {K.shape[0]} cells and the "
+                    f"exposure asks for {frac.size}: a stock is cut "
+                    "for one geometry")
+            n = emulsion.develop_on(K, thr, frac.reshape(-1)) \
+                .reshape(frac.shape)
+        else:
+            n = emulsion.expose(frac, ceiling, pr["grain_um2"],
+                                float(pitch_um), seed, label=name)
         d = (KAPPA * pr["grain_um2"] / area) * n
     absorb = np.array(pr["absorb"], np.float32)
     if pigment or pr.get("pigment"):

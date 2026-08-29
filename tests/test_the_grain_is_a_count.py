@@ -284,6 +284,22 @@ def test_a_stored_sheet_prints_the_same_print():
     fresh = emulsion.expose(frac, 2.1, pr["grain_um2"], FINE, seed=13,
                             label="silver")
     assert np.array_equal(stored, fresh.reshape(-1))
+    # and through the whole print chain: sheet= replaces the seed
+    neg = np.full((96, 96, 3), 0.6, np.float32)
+    K2, thr2 = emulsion.coat(neg.shape[0] * neg.shape[1], 2.1,
+                             pr["grain_um2"], FINE, seed=13)
+    a = process_print(neg, 1.0, "silver", grain=True, pitch_um=FINE,
+                      seed=13)
+    b = process_print(neg, 1.0, "silver", grain=True, pitch_um=FINE,
+                      sheet=(K2, thr2))
+    assert np.array_equal(a, b)
+    # a stock cut for one geometry refuses another
+    with pytest.raises(ValueError, match="one geometry"):
+        process_print(neg[:4], 1.0, "silver", grain=True,
+                      pitch_um=FINE, sheet=(K2, thr2))
+    # and the aggregate regime refuses to be coated at all
+    with pytest.raises(ValueError, match="aggregate"):
+        emulsion.coat(64, 2.1, pr["grain_um2"], 100.0, seed=1)
 
 
 def test_grain_off_is_the_old_path_exactly():
