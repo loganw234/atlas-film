@@ -190,6 +190,66 @@ def test_smoothness_is_a_prediction_now():
     assert sig["salt"] < 3e-4, sig
 
 
+FINE = 1.0          # um - a pitch near the crystal, the resolved regime
+
+
+def test_the_sheet_exists_before_the_light():
+    """The emulsion-first formulation's first claim: the crystal
+    field is laid at coating, from the seed alone. A saturating
+    exposure develops every crystal, so two DIFFERENT saturating
+    exposures on the same seed print the identical field - the sheet
+    itself - and a different seed prints a different sheet."""
+    kw = dict(shape=(96, 96), grain=True, pitch_um=FINE)
+    a = G.uniform_print("silver", 50.0, seed=4, **kw)
+    b = G.uniform_print("silver", 80.0, seed=4, **kw)
+    c = G.uniform_print("silver", 50.0, seed=5, **kw)
+    assert np.array_equal(a, b), "the ceiling is not the sheet's own"
+    assert not np.array_equal(a, c)
+
+
+def test_more_light_never_undevelops_a_fixed_sheet(monkeypatch):
+    """The coupling that makes it a sheet: development is the
+    deterministic amplification of fixed per-cell luck, so raising
+    the exposure can only develop MORE crystals, pixel by pixel.
+    Independent draws per exposure - the organ's first formulation -
+    invert this on roughly half the mass between neighbouring doses;
+    no overlay of accurate patterns can pass it."""
+    kw = dict(shape=(128, 128), grain=True, pitch_um=FINE)
+    fields = [G.density_field("silver", G.uniform_print(
+        "silver", dose, seed=11, **kw))
+        for dose in (0.2, 0.6, 1.5, 6.0, 50.0)]
+    for lo, hi in zip(fields, fields[1:]):
+        assert np.all(hi - lo > -1e-9), \
+            "a cell undeveloped as the light rose"
+
+
+def test_a_pixel_smaller_than_the_crystal_refuses():
+    """The honesty floor, per process: a cell narrower than the
+    particle cannot hold an independent count - silver's bundles are
+    0.5 um, gum's aggregates 3.2 um - and the emulsion refuses by
+    name rather than printing a lie."""
+    neg = np.full((4, 4, 3), 0.5, np.float32)
+    with pytest.raises(ValueError, match="honest"):
+        process_print(neg, 1.0, "silver", grain=True, pitch_um=0.3)
+    with pytest.raises(ValueError, match="honest"):
+        process_print(neg, 1.0, "gum", grain=True, pitch_um=2.0)
+    # and exactly at the floor it prints
+    process_print(neg, 1.0, "silver", grain=True, pitch_um=0.51)
+
+
+def test_saunders_law_survives_in_the_resolved_regime():
+    """The marginal must not have moved: near the floor, where the
+    exact binomial-quantile path runs and lambda is a handful of
+    crystals, the fluctuation is still sqrt(kappa*a*D/A) - the
+    thinning theorem, now with the sheet as a real object."""
+    img = G.uniform_print("silver", 0.8, shape=(256, 256),
+                          grain=True, pitch_um=FINE, seed=6)
+    d = G.density_field("silver", img)
+    want = float(np.sqrt(
+        KAPPA * PROCESSES["silver"]["grain_um2"] * d.mean() / FINE ** 2))
+    assert G.rms_granularity(d) == pytest.approx(want, rel=0.03)
+
+
 def test_grain_off_is_the_old_path_exactly():
     """grain=False must be the pre-organ arithmetic to the bit - the
     goldens' guarantee, asserted here as well as there."""

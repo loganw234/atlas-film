@@ -16,6 +16,8 @@ medium ledger's (`atlas-darkroom/docs/film-extraction.md`).
 
 import numpy as np
 
+from atlas_film import emulsion
+
 
 def _hex(c):
     """A colour a person typed, in either length CSS allows.
@@ -177,15 +179,20 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0,
                   grain=False, pitch_um=None, seed=0):
     """Expose, develop and read a print in one of the historic processes.
 
-    `grain=True` makes the deposit a COUNT: each pixel's density
-    becomes a Poisson realisation of the number of image particles a
-    pixel of that physical size holds, through Nutting's relation both
-    ways (Argyronomicon SS21.2/21.4 - Saunders' treatment: sigma_N =
-    sqrt(N), so sigma_D = sqrt(kappa*a*D/A)). It needs `pitch_um`
-    because a count lives on a sheet, and it needs the process to
-    carry a SOURCED particle area `grain_um2` - a process whose
-    particle no source has measured refuses rather than inventing
-    one, the same abstention the absorption tables keep.
+    `grain=True` prints on a SHEET (atlas_film.emulsion): the seed
+    coats a crystal field before any image exists, exposure thins it
+    through the response curve read as a per-crystal probability, and
+    development amplifies deterministically, all-or-nothing. The
+    marginal fluctuation at any one exposure is Saunders' law
+    (Argyronomicon SS21.2/21.4: sigma_D = sqrt(kappa*a*D/A)) exactly
+    as before; what the formulation adds is the sheet as an object -
+    same seed, same crystals, whatever is printed on them. It needs
+    `pitch_um` because a count lives on a sheet, refuses pixels
+    smaller than the process's crystal (the emulsion's honesty
+    floor), and needs a SOURCED particle area `grain_um2` - a
+    process whose particle no source has measured refuses rather
+    than inventing one, the same abstention the absorption tables
+    keep.
 
     Declared simplifications, from the dossier's own synthesis: the
     particle area is CONSTANT per process, while printing-out papers
@@ -243,18 +250,28 @@ def process_print(neg, E, name, *, pigment=None, contrast=1.0, dmax_mul=1.0,
     # Audit-8-17 finding 9.
     d = (pr["dmax"] * dmax_mul) * (1.0 - np.exp(-dose)) ** (pr["toe"] * contrast)
     if grain:
-        # the deposit, realised as the count it physically is: mean
-        # particle number per pixel from Nutting, a Poisson draw
-        # about it, and back to density through the same relation -
-        # so the mean is exact and the fluctuation is Saunders' law
-        # with no dial anywhere. One population of particles: the
-        # per-channel colouring below multiplies the SAME realised
-        # deposit, which is why grain is monochrome in a single
-        # process, as it is on a real print.
+        # THE SHEET COMES FIRST (atlas_film.emulsion). The seed lays
+        # a crystal field at coating density before any image; the
+        # response curve, read as the developable FRACTION it has
+        # always statistically been, thins it; and development is
+        # the deterministic all-or-nothing amplification of each
+        # cell's fixed luck. So more light on the same sheet only
+        # develops more crystals, a saturating exposure prints the
+        # sheet itself, and the marginal law at any one exposure is
+        # the same Saunders fluctuation the referee has pinned since
+        # the organ landed - the statistics did not move, the OBJECT
+        # appeared. The emulsion refuses pixels smaller than the
+        # crystal (its honesty floor). One population of particles:
+        # the per-channel colouring below multiplies the SAME
+        # realised deposit, which is why grain is monochrome in a
+        # single process, as it is on a real print.
         area = float(pitch_um) ** 2
-        lam = d.astype(np.float64) * area / (KAPPA * pr["grain_um2"])
-        rng = np.random.default_rng(seed)
-        d = (KAPPA * pr["grain_um2"] / area) * rng.poisson(lam)
+        ceiling = float(pr["dmax"] * dmax_mul)
+        frac = (1.0 - np.exp(-dose.astype(np.float64))) \
+            ** (pr["toe"] * contrast)
+        n = emulsion.expose(frac, ceiling, pr["grain_um2"],
+                            float(pitch_um), seed, label=name)
+        d = (KAPPA * pr["grain_um2"] / area) * n
     absorb = np.array(pr["absorb"], np.float32)
     if pigment or pr.get("pigment"):
         # a ground pigment absorbs the complement of its own colour
