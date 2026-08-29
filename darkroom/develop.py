@@ -619,7 +619,8 @@ def blur_microns(img, sigma_um, fmt=None):
 
 def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None,
                      blades=0.0, blade_curve=0.0, blade_rot=0.0,
-                     traced=False):
+                     traced=False, aberrated=False, lens_name=None,
+                     conjugate=10.0):
     """Soften by the diffraction limit of the aperture actually used.
 
     The Airy disk's first zero sits at 1.22*lambda*N. At f/64 and green
@@ -640,16 +641,41 @@ def diffraction_blur(neg, fstop, *, amount=1.0, fmt=None,
     # pitch, and where the pitch cannot resolve it (a proof), or
     # the sibling package is absent, the Airy path below stands -
     # a declared fallback, not a silent one, per docs/mk3-optics.md.
-    if traced and blades >= 3.0:
+    #
+    # ABERRATED, since the faithfulness arc: with `aberrated` and a
+    # named traced lens, the pupil function carries the wavefront the
+    # glass actually produced - gpu.opd_map's OPD at this negative's
+    # own conjugate and stop, per channel at its own wavelength - so
+    # the kernel is the star test, not the textbook pattern: the
+    # aberration-diffraction interplay at last. Axial field, declared
+    # (the field-varying kernel is the recorded refinement); a round
+    # iris uses the circle pupil; a lens that cannot be resolved
+    # falls back to the phase-free path, declared here.
+    if traced and (blades >= 3.0 or (aberrated and lens_name)):
         try:
             from atlas_optical import iris as _iris
         except ImportError:
             _iris = None
         if _iris is not None:
+            waves = [None, None, None]
+            if aberrated and lens_name:
+                try:
+                    from atlas_optical import gpu as _aog
+                    from atlas_optical import lenses as _aol
+                    entry = _aol.get(lens_name)
+                    obj = float(conjugate) * float(entry["focal_mm"])
+                    waves = [_aog.opd_map(
+                        entry, obj, float(fstop) * max(amount, 1e-6),
+                        channel=ch, m=256)["w_mm"] for ch in range(3)]
+                except (ImportError, KeyError, ValueError):
+                    waves = [None, None, None]
+            b, cv, rt = ((blades, blade_curve, blade_rot)
+                         if blades >= 3.0 else (3.0, 1.0, 0.0))
             pitch = _pitch_um(neg.shape[1], neg.shape[0], fmt)
-            kerns = [_iris.iris_psf(blades, blade_curve, blade_rot,
+            kerns = [_iris.iris_psf(b, cv, rt,
                                     float(fstop) * max(amount, 1e-6),
-                                    LAMBDA_UM[ch], pitch)
+                                    LAMBDA_UM[ch], pitch,
+                                    wavefront_mm=waves[ch])
                      for ch in range(3)]
             if all(k is not None for k in kerns):
                 out = np.empty_like(neg)
@@ -1264,6 +1290,7 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
             mackie=0.0, mackie_um=90.0,
             fstop=0.0, diffraction=0.0,
             blades=0.0, blade_curve=0.0, blade_rot=0.0, traced=False,
+            aberrated=False, lens_name=None, conjugate=10.0,
             halation_strength=0.0, halation_radius=140.0,
             shadow=0.0, shadow_radius=0.02,
             shoulder=0.0, split=0.0,
@@ -1306,7 +1333,9 @@ def develop(neg, *, exposure=None, ev=0.0, gamma=0.82, saturation=1.0,
     if diffraction > 0 and fstop:
         neg = diffraction_blur(neg, fstop, amount=diffraction, fmt=fmt,
                                blades=blades, blade_curve=blade_curve,
-                               blade_rot=blade_rot, traced=traced)
+                               blade_rot=blade_rot, traced=traced,
+                               aberrated=aberrated, lens_name=lens_name,
+                               conjugate=conjugate)
     if halation_strength > 0:
         neg = halation(neg, strength=halation_strength,
                        radius_um=halation_radius, fmt=fmt)
