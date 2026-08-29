@@ -68,6 +68,17 @@ Declared open: POP's size-with-count coupling (Reilly's TEM),
 size distributions and the linear-vs-sqrt(D) tension, toning
 geometry, tricolour-layer grain.*
 
+*Deepened to emulsion-first 2026-08-29 (`atlas_film/emulsion.py`):
+the sheet exists before the light - crystal field at coating
+density from the seed alone, exposure thins it, development is the
+deterministic quantile of fixed per-cell luck. Marginal law
+unchanged to the digit (every referee test green untouched); gained:
+sheet-before-light, pixelwise monotonicity in exposure, the ceiling
+as the sheet's own realised field, and the honesty floor - grain
+refuses pixels narrower than the process's crystal. The road this
+opens, on the record: Sabattier and adjacency acting on the realised
+crystal field rather than the mean.*
+
 ## 3. Reciprocity failure
 
 The negative already records its shutter; long exposures on real
