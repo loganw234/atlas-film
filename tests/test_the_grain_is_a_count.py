@@ -208,9 +208,9 @@ def test_the_sheet_exists_before_the_light():
 
 
 def test_more_light_never_undevelops_a_fixed_sheet(monkeypatch):
-    """The coupling that makes it a sheet: development is the
-    deterministic amplification of fixed per-cell luck, so raising
-    the exposure can only develop MORE crystals, pixel by pixel.
+    """The coupling that makes it a sheet: every crystal carries a
+    fixed sensitivity threshold laid at coating, so raising the
+    exposure can only develop MORE of them, pixel by pixel.
     Independent draws per exposure - the organ's first formulation -
     invert this on roughly half the mass between neighbouring doses;
     no overlay of accurate patterns can pass it."""
@@ -248,6 +248,42 @@ def test_saunders_law_survives_in_the_resolved_regime():
     want = float(np.sqrt(
         KAPPA * PROCESSES["silver"]["grain_um2"] * d.mean() / FINE ** 2))
     assert G.rms_granularity(d) == pytest.approx(want, rel=0.03)
+
+
+def test_the_increments_carry_the_thinning_law():
+    """The reason crystals carry THRESHOLDS rather than each cell one
+    luck value. Between two exposures of one sheet, thinned-Poisson
+    physics makes the newly developed count its own Poisson:
+    Var(n2 - n1) = lambda_K * (p2 - p1). WATCHED FAILING under the
+    fixed-luck quantile coupling 2026-08-29: wanted 2.58, measured
+    0.44 - six-fold under-dispersed increments, invisible to every
+    single-exposure statistic and fatal to exposure ladders, double
+    exposure, and any future Sabattier on the realised field."""
+    lam = 2.1 * FINE ** 2 / (KAPPA * PROCESSES["silver"]["grain_um2"])
+    kw = dict(shape=(256, 256), grain=True, pitch_um=FINE)
+    step = KAPPA * PROCESSES["silver"]["grain_um2"] / FINE ** 2
+    n1 = G.density_field("silver", G.uniform_print(
+        "silver", 0.55, seed=9, **kw)) / step
+    n2 = G.density_field("silver", G.uniform_print(
+        "silver", 0.75, seed=9, **kw)) / step
+    dp = float(n2.mean() - n1.mean()) / lam
+    assert float(np.var(n2 - n1, ddof=1)) == pytest.approx(
+        lam * dp, rel=0.1)
+
+
+def test_a_stored_sheet_prints_the_same_print():
+    """The film stock claim: coat once, develop against the stored
+    crystals, and the print is bit-identical to the throwaway path
+    with the same seed - a stock is a cache of the sheet, not a
+    second model."""
+    from atlas_film import emulsion
+    pr = PROCESSES["silver"]
+    frac = np.linspace(0.05, 0.95, 96 * 96).reshape(96, 96)
+    K, thr = emulsion.coat(frac.size, 2.1, pr["grain_um2"], FINE, seed=13)
+    stored = emulsion.develop_on(K, thr, frac.reshape(-1))
+    fresh = emulsion.expose(frac, 2.1, pr["grain_um2"], FINE, seed=13,
+                            label="silver")
+    assert np.array_equal(stored, fresh.reshape(-1))
 
 
 def test_grain_off_is_the_old_path_exactly():
