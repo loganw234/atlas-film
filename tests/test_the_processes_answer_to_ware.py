@@ -53,8 +53,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from atlas_film import sensitometry as S               # noqa: E402
-from atlas_film.processes import PROCESSES             # noqa: E402
+from atlas_film import sensitometry as S
+from atlas_film.processes import PROCESSES
 
 
 def test_the_reader_reproduces_the_dossiers_independent_column():
