@@ -144,10 +144,16 @@ def _coat_band(rng, n_cells, lam_k):
         return K, np.zeros((n_cells, 0), np.uint16), kmax
     E = rng.standard_exponential((n_cells, kmax + 1), dtype=np.float32)
     C = np.cumsum(E, axis=1, dtype=np.float64)
+    del E                       # 0.9 GB a band, dead the moment it is summed
     denom = np.take_along_axis(C, K[:, None].astype(np.intp), axis=1)
     with np.errstate(invalid="ignore", divide="ignore"):
-        u = C[:, :kmax] / denom
-    thr = np.minimum(u * 65536.0, 65535.0).astype(np.uint16)
+        # IN PLACE, and the same elementwise division: a separate
+        # quotient array costs 1.7 GB a band at chunk scale, and the
+        # measured peak is what decides how many sheets can be coated
+        # at once (one 64M-cell chunk measured 8.8 GB before this)
+        C /= denom
+    thr = np.minimum(C[:, :kmax] * 65536.0, 65535.0).astype(np.uint16)
+    del C
     thr[np.arange(kmax)[None, :] >= K[:, None]] = np.uint16(65535)
     # a threshold of 65535 is reserved for "beyond this cell's K":
     # a real crystal quantised there still develops at p = 1 because
@@ -189,9 +195,17 @@ def coat(n_cells, ceiling, grain_um2, pitch_um, seed, label=""):
         Ks.append(K)
         thrs.append(thr)
         kmax = max(kmax, km)
-    thrs = [np.pad(t, ((0, 0), (0, kmax - t.shape[1])),
-                   constant_values=np.uint16(65535)) for t in thrs]
-    return np.concatenate(Ks), np.vstack(thrs)
+    # assembled by filling a single output and freeing each band as it
+    # lands: padding every band and then stacking held two full copies
+    # of the sheet at once, which at chunk scale is gigabytes for
+    # nothing
+    out = np.full((n_cells, kmax), np.uint16(65535), np.uint16)
+    row = 0
+    for i, t in enumerate(thrs):
+        out[row:row + t.shape[0], :t.shape[1]] = t
+        row += t.shape[0]
+        thrs[i] = None
+    return np.concatenate(Ks), out
 
 
 def _kappa():
