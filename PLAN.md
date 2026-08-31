@@ -480,6 +480,19 @@ independent-layer model is the declared simplification either
 way, and the referee that asserts layer independence gets a
 comment naming what real film deliberately violates.
 
+*Landed 2026-08-31, same day: lane O delivered the printed
+conventional-negative gamma-ratio triple (R 1.49 / G 1.64 /
+B 1.50) and the founding patent's driver law, and organ 9 shipped
+exact-at-neutral (neutral sweeps bit-identical, asserted), the
+ratio read back through the public surface on every stock. The
+batch lottery and pouring field landed the same day from D10;
+the flare organ landed when lane M returned with the full era
+ladder (uncoated 0.6-6.3% by surface count, coated 1.4%,
+multicoated 0.4%, the scene-level factor emerging per scene as
+Jones & Condit measured). Of the three structural gaps, two are
+closed and the third - the emulsion's sharpness - waits only on
+lane L's traces.*
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
