@@ -332,6 +332,52 @@ bit-identically and the golden row pins the cancellation. 88
 tests. Record: darkroom
 docs/test-records/2026-08-31-the-eye-and-the-clock.md.*
 
+## Organ 5 - the developer's hand, and the wet plate
+
+Development time as a contrast dial, from the sheets' own traced
+CI curves (developer-hand dossier, lane I: sixteen developer/time
+combinations traced vector-exact from the PDFs' path operators,
+residuals 0.0002-0.007 in data units). The lane's load-bearing
+derivation: every Kodak-recommended 20 C time lands on contrast
+index 0.553-0.571 - "normal development" IS CI ~ 0.56 - so
+push/pull becomes a displacement along the stock's own curve.
+
+The dial is `ci=`: the contrast the negative was developed to, in
+the stock's own measure (contrast index diffuse-visual for the
+Kodak four; gamma Status M for 5222, whose sheet prints five
+gammas that fit a LINEAR time law to 0.007; H&D's development
+factor for the plates, whose law - time scales gamma, ratios
+fixed - the early-plates lane already holds). Implementation is
+gamma scaling against the stock's normal contrast, span fixed:
+the properly compensated negative, exactly as organ 3 argued.
+Bounds are each table's own traced span, refusing outside; colour
+refuses entirely (no lane); collodion refuses BY MECHANISM -
+development time is not a contrast control there (45-90 s
+"equally satisfactory", lane I): halide loading and
+intensification are its knobs, and the intensification dial waits
+for its own landing. The reciprocity tables' paired development
+cuts stay declared as organ 3 left them. Corrections the lane
+forced, recorded: T-MAX 100's normal is 8 3/4 min (not the 8 the
+constants comment carried), T-MAX 400's is 7 1/2; TRI-X's pin (CI
+0.56 at 6 min) is CONFIRMED at 0.554.
+
+AND COLLODION TAKES THE SHELF. The 1998 JIST recreation delivered
+what lane D could not: a traced characteristic curve (1.1%
+iodide, iron development, 19 points off the one separable curve,
+axis calibration 0.001/0.009 residuals), carried as a sampled
+table because the bent shoulder is the source's own geometry
+("densities below 1 are formed only by surface silver"). fog=0
+on the net-density axis; blue-eyed (spectral max ~420 nm); grain
+DECLARED granularity-equivalent at 0.196 um2 - the measured
+microfilm-low granularity outranks the 4-6 um iodide particle
+size because Dutton's opaque-disc assumption fails for
+surface-stacked silver, and the conflict is recorded at the
+constant. The absolute axis is BRACKETED and flagged twice over:
+the authors' working index DIN -9 (~ISO 0.1, the lane's own
+conversion, flagged) agrees with Towler's 1864 field exposures
+within a stop. Reciprocity refuses (nothing sourced); ci refuses
+(the mechanism, above); intensification is the named future dial.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
