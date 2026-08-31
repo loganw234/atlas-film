@@ -105,6 +105,58 @@ physics living in the darkroom pipeline because they are coupled to
 its blur machinery. Each moves here when its organ deepens it - the
 extraction document's table is where that debt stays visible.
 
+## 6. The camera stock: the negative becomes a sheet
+
+*Planned 2026-08-31, before the work. This is the organ the project
+has pointed at since the darkroom became the integrator: until now
+the chain has been "a perfect plate behind a faithful lens,
+contact-printed onto faithful paper" - every process in PROCESSES is
+a PRINT medium, and the render reaches it as an ideal latent image.
+This organ puts an emulsion at the film plane.*
+
+**The chain.** The aerial image exposes a CAMERA STOCK - a real
+named film with sourced constants - through the same emulsion
+physics the print grain already earned: a crystal field coated from
+a seed (storable, the film-stock machinery unchanged), thinned by
+the stock's own response curve read as per-crystal probability,
+developed all-or-nothing on fixed thresholds. The result is a
+NEGATIVE: a density field with real grain at the negative's own
+pitch, plus the stock's base+fog - which also counts crystals, so
+the rebate and the shadows carry fog grain as real film does. The
+paper process then prints THROUGH it: transmittance 10^-D becomes
+the printing light, re-metered (the enlarger's exposure is its own
+decision), optionally enlarged - same array, bigger sheet, so the
+negative's grain magnifies onto the print exactly as an enlarger
+magnifies it, and the paper's own grain rides on top at the print's
+own pitch. Two sheets, two grains, compounding - which is what a
+silver print of a film negative IS.
+
+**Constants, sourced or refused.** `FILMS` carries per stock: dmax,
+toe (fit jointly to the published contrast aim, the reconciliation
+organ's discipline), speed, fog, grain_um2. The grain areas are
+already in the dossier (Tri-X 17 -> 1.2 um2, Double-X 14 -> 0.82,
+T-MAX 100's 8 -> 0.27, all via Saunders' inversion of published rms
+granularity); the curve constants ship only when the sensitometry
+lane lands, and a stock missing them refuses by name. Wet-plate and
+dry-plate stocks are wanted sources, not inventions.
+
+**What stays declared.** The enlarger is ideal (no enlarging-lens
+PSF); spectral response is still the luma placeholder (organ 4's
+home is now HERE, at the film stage, where panchromatic/ortho
+belongs); reciprocity likewise (organ 3 - the datasheets' own
+adjustment tables are its calibration and ride the dossier);
+solarise remains a print-development model where it is; colour
+negative film does not exist yet - a B&W negative prints every
+process monochrome, which is a fact, not a gap.
+
+**Referees before the organ:** the curve reader against published
+contrast aims; the fog-grain claim (unexposed film fluctuates,
+Poisson, about fog); the double inversion (bright scene -> dense
+negative -> light print); monotonicity and the sheet laws inherited
+through the chain; the enlargement bookkeeping (negative pitch vs
+print pitch, both grains at their own scales). Golden rows for the
+chain bake as new rows; no existing pin moves.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
