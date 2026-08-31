@@ -43,6 +43,8 @@ name.
 import numpy as np
 
 from atlas_film import emulsion
+from atlas_film.mtf import MTF_BW as _MTF_BW
+from atlas_film.mtf import apply as _mtf_apply
 from atlas_film.processes import KAPPA
 
 # THE CURVE FAMILY IS SENSITOMETRY'S OWN, not the print table's. A
@@ -592,7 +594,7 @@ def _intensify_factor(name, intensify):
 
 def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
              sheet=None, t=None, ci=None, intensify=None,
-             batch=None):
+             batch=None, mtf=True):
     """Expose a camera stock to the aerial image and develop it.
 
     `img` is the aerial image - a (..., 3) RGB field collapses
@@ -619,6 +621,12 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     st = _stock(name)
     f = _intensify_factor(name, intensify)
     dose = np.maximum(_project(img, st) * E, 0.0)
+    if mtf and pitch_um and name in _MTF_BW and dose.ndim == 2:
+        # THE EMULSION'S SHARPNESS (organ 8): the stock's traced
+        # MTF applied to the exposure at the negative's own pitch.
+        # Needs the pitch, like grain - a curve evaluation without
+        # a sheet geometry has no spatial physics to apply.
+        dose = _mtf_apply(dose, _MTF_BW[name], float(pitch_um))
     pour = None
     if batch is not None:
         shift, pour = _batch_draw(name, batch, dose.shape)

@@ -308,15 +308,21 @@ INTERIMAGE = {
 
 
 def _develop_layers(rgb, E, stock, pitch_um, grain, seed, label,
-                    interimage=True):
+                    interimage=True, mtf=True):
     """The three sheets, each exposed through its own sensitivity
-    row - and, on the stocks whose class carries it, talking to
-    each other through the DIR coupling (organ 9)."""
+    row - filtered by its own traced MTF at the negative's pitch
+    (organ 8) - and, on the stocks whose class carries it, talking
+    to each other through the DIR coupling (organ 9)."""
+    from atlas_film.mtf import MTF_COLOUR
+    from atlas_film.mtf import apply as _mtf_apply
     rgb = np.maximum(np.asarray(rgb, np.float64), 0.0)
     ks = INTERIMAGE.get(label) if interimage else None
+    triples = MTF_COLOUR.get(label) if mtf and pitch_um else None
     xs, d0 = [], []
-    for layer in stock["layers"]:
+    for i, layer in enumerate(stock["layers"]):
         h = (rgb @ np.asarray(layer["sens"], np.float64)) * E
+        if triples is not None and h.ndim == 2:
+            h = _mtf_apply(h, triples[i], float(pitch_um))
         x = np.log10(np.maximum(h, 1e-30))
         xs.append(x)
         d0.append(_layer_curve(layer, x))
@@ -371,7 +377,7 @@ def _assemble(dyes, stock):
 
 
 def negative(rgb, E, name, *, pitch_um=None, grain=True, seed=0,
-             t=None, interimage=True):
+             t=None, interimage=True, mtf=True):
     """Expose a colour camera stock and develop it: the negative's
     per-channel Status M density field, mask and all. `t` is the
     exposure duration in seconds - inside the sheet's sourced flat
@@ -384,7 +390,7 @@ def negative(rgb, E, name, *, pitch_um=None, grain=True, seed=0,
         reciprocity(name, t)
     return _assemble(
         _develop_layers(rgb, E, st, pitch_um, grain, seed, name,
-                        interimage=interimage), st)
+                        interimage=interimage, mtf=mtf), st)
 
 
 def transmit(D):
@@ -460,7 +466,7 @@ def _solve_lights(t_patch, print_name):
 
 
 def positive(neg_T, name, *, lights=(1.0, 1.0, 1.0), pitch_um=None,
-             grain=False, seed=0, t=None):
+             grain=False, seed=0, t=None, mtf=True):
     """Print through the negative: the print film's three layers
     exposed by transmitted light times the printer's per-channel
     lights, assembled to the PRINT's density field. `t` is the
@@ -473,7 +479,8 @@ def positive(neg_T, name, *, lights=(1.0, 1.0, 1.0), pitch_um=None,
     light = np.asarray(neg_T, np.float64) * np.asarray(lights,
                                                        np.float64)
     return _assemble(
-        _develop_layers(light, 1.0, pf, pitch_um, grain, seed, name),
+        _develop_layers(light, 1.0, pf, pitch_um, grain, seed, name,
+                        mtf=mtf),
         pf)
 
 
