@@ -190,6 +190,87 @@ FILMS = {
             (0.07, 0.10, 0.17, 0.30, 0.44, 0.57, 0.70, 0.81, 0.91,
              0.96, 1.07, 1.13, 1.18, 1.22, 1.30, 1.38, 1.43, 1.49,
              1.57))),
+    # FOUR MORE SHEETS (four-more-sheets dossier, lane K), all
+    # carried as traced tables - the geometry is the source, and
+    # tables clamp honestly where a sheet stops plotting.
+    #
+    # PLUS-X 125 (F-4018): D-76 small tank 20C at the tabulated
+    # 5 1/2 min normal, time-interpolated between the plotted 5 and
+    # 7 min curves (flagged derived, K4). The lane's calibration
+    # anchor: its ISO 6 speed point EMERGES within 0.017 log H of
+    # ISO 125 - the axis is absolute and unshifted. Grain: rms 10 -
+    # measured in HC-110 (B) at 70F large tank (K5), a different
+    # developer than the curve; the mismatch is the sheet's own and
+    # cannot be closed inside it. Flat pan (F15).
+    "plusx": dict(
+        fog=0.0, dmax=1.718, grain_um2=0.417, sens=_PAN,
+        curve=(
+            (-3.10, -3.00, -2.80, -2.60, -2.40, -2.20, -2.00,
+             -1.80, -1.60, -1.40, -1.20, -1.00, -0.80, -0.60,
+             -0.40, -0.20, 0.00, 0.20),
+            (0.255, 0.258, 0.264, 0.277, 0.306, 0.353, 0.420,
+             0.502, 0.602, 0.708, 0.820, 0.940, 1.070, 1.206,
+             1.347, 1.474, 1.598, 1.718))),
+    # T-MAX P3200 (F-4001): T-MAX Developer small tank 20C at the
+    # 9 1/2 min normal (interpolated 10/7 min, K1) - AND RE-ANCHORED
+    # by -0.764 log H, because the lane caught the sheet's curve
+    # artwork sitting ~2.3 stops off its own stated EI (K2, a
+    # publisher defect: the Plus-X control from the same tracer
+    # lands at +0.017, so the method is not the cause). The shape
+    # is the sheet's; the axis is the sheet's own EI 1000 statement
+    # applied as K2 prescribes. Speed here is anchored, NOT
+    # emergent - the one stock on the shelf whose ISO check is a
+    # wiring assertion rather than a discovery, recorded as such.
+    # Grain: rms 18, D-76-based (K3) against a T-MAX-developer
+    # curve - the sheet's own pairing, flagged.
+    "p3200": dict(
+        fog=0.0, dmax=2.338, grain_um2=1.350, sens=_PAN,
+        curve=(
+            (-3.864, -3.764, -3.564, -3.364, -3.164, -2.964,
+             -2.764, -2.564, -2.364, -2.164, -1.964, -1.764,
+             -1.564, -1.364, -1.164, -0.964, -0.764, -0.564),
+            (0.289, 0.293, 0.305, 0.332, 0.371, 0.432, 0.541,
+             0.682, 0.828, 0.971, 1.107, 1.239, 1.377, 1.529,
+             1.705, 1.902, 2.117, 2.338))),
+    # ILFORD FP4 PLUS: ILFOTEC HC (1+31) 8 min 20C - the sheet's
+    # own tabulated normal for the rated EI 125 (K7, vector trace
+    # cross-checked against the current Nov 2018 raster to 0.005
+    # D). The sheet plots RELATIVE log exposure; the axis here is
+    # anchored by K8's explicit offset (-3.4235) so the speed
+    # point sits at ISO 125 BY CONSTRUCTION - an imposed
+    # assumption, named, with the translation-invariant ISO 6
+    # contrast criterion (+0.041 D) as the real validation. Grain:
+    # rms 10 from the MOTION-PICTURE coating in D-96 (F1) - three
+    # developers across three properties (curve ILFOTEC HC, speed
+    # ID-11, grain D-96), the K8 mismatch carried openly.
+    "fp4": dict(
+        fog=0.0, dmax=1.862, grain_um2=0.417, sens=_PAN,
+        curve=(
+            (-3.024, -2.824, -2.624, -2.424, -2.224, -2.024,
+             -1.824, -1.624, -1.424, -1.224, -1.024, -0.824,
+             -0.624, -0.424, -0.224, -0.024, 0.176, 0.376, 0.576),
+            (0.095, 0.095, 0.097, 0.117, 0.181, 0.271, 0.379,
+             0.496, 0.630, 0.781, 0.936, 1.091, 1.259, 1.425,
+             1.570, 1.693, 1.788, 1.843, 1.862))),
+    # ILFORD HP5 PLUS: ILFOTEC HC (1+31) 6 1/2 min 20C, the rated
+    # EI 400 normal (K10); relative axis anchored by K11's offset
+    # (-3.7746), contrast criterion -0.040 D. The plotted curve is
+    # STILL CLIMBING at its cut - the sheet plots no shoulder, and
+    # the table's clamp is a clamp at the edge of the plot, not a
+    # claim the emulsion shoulders there (K10's warning carried).
+    # Grain: rms 16, MP coating in D-96 (F2), same three-developer
+    # mismatch as FP4 - though the D-96 gamma aim 0.65-0.70
+    # matches this curve's traced 0.64-0.65 gradient, so the
+    # CONTRAST states are close even where the developers are not.
+    "hp5": dict(
+        fog=0.0, dmax=2.072, grain_um2=1.067, sens=_PAN,
+        curve=(
+            (-3.375, -3.175, -2.975, -2.775, -2.575, -2.375,
+             -2.175, -1.975, -1.775, -1.575, -1.375, -1.175,
+             -0.975, -0.775, -0.575, -0.375, -0.175, 0.025, 0.225),
+            (0.177, 0.185, 0.210, 0.254, 0.320, 0.408, 0.521,
+             0.654, 0.791, 0.922, 1.052, 1.181, 1.309, 1.437,
+             1.564, 1.691, 1.817, 1.944, 2.072))),
 }
 
 _CURVE_KEYS = ("fog", "dmax", "gamma", "ht", "wt", "ws")
@@ -292,20 +373,26 @@ def _stock(name):
 def _dev_factor(name, ci):
     """Validate a ci= request against the stock's own contrast
     table and return the gamma multiplier ci/normal."""
-    st = _stock(name)
-    if "curve" in st:
-        raise ValueError(
-            "collodion contrast is not a development-time dial: "
-            "45-90 s develop 'equally satisfactory' (lane I18) - "
-            "halide loading and intensification set its gamma, and "
-            "the intensification dial has not landed")
+    _stock(name)
     if name not in CONTRAST:
+        if name == "collodion":
+            raise ValueError(
+                "collodion contrast is not a development-time "
+                "dial: 45-90 s develop 'equally satisfactory' "
+                "(lane I18) - halide loading and intensification "
+                "set its gamma")
+        if name in ("manchester", "hd22"):
+            raise ValueError(
+                f"{name!r} has no contrast-vs-development table: "
+                "the plates' H&D ratio law raises Dmax with "
+                "development, and the crystal ceiling a scaled "
+                "plate needs is not yet declared - the capacity "
+                "question stands")
         raise ValueError(
-            f"{name!r} has no contrast-vs-development table: the "
-            "plates' H&D ratio law raises Dmax with development, "
-            "and the crystal ceiling a scaled plate needs is not "
-            "yet declared - the development-factor dial lands with "
-            "the capacity question answered")
+            f"{name!r} has no traced contrast-vs-development "
+            "table: its sheet's CI curves await a tracing lane, "
+            "and extrapolating another stock's would contradict "
+            "the per-stock spread the dossiers measured")
     c = CONTRAST[name]
     cis = [p[1] for p in c["curve"]]
     if not min(cis) <= ci <= max(cis):
