@@ -250,6 +250,79 @@ lane's measured 1.25-4 um dye clouds in chromogenic PAPERS now
 corroborate the negatives' granularity-equivalent areas from one
 rung down).*
 
+## Organ 4 - spectral response (camera side)
+
+The film stage sees luminance through fixed luma weights - a
+placeholder the extraction ledger has carried by name since organ
+6. The organ retires it: each camera stock gains `sens=(r, g, b)`,
+its response projected onto the render's three broad bands,
+normalised to sum one so a neutral scene's metering is unchanged.
+
+The projection is DECLARED, not fit: the render's channels carry
+no spectra to integrate against, so a class projects to the
+maximum-entropy weights consistent with its sheet - panchromatic
+(all four Kodak stocks, FILM-N16: ~250-650 nm, cliff at 650-660)
+projects flat (1/3, 1/3, 1/3); blue-sensitive plates (early-plates
+D9/D13: blue/violet/UV only, "as black as Indian ink" to the rest)
+project (0, 0, 1) with the UV lobe beyond the render's reach,
+declared. The true peaks ride the comments (TRI-X 380-400 with a
+560-620 shoulder; 5222 420-440). An ortho class exists the moment
+a sourced ortho stock does. `negative`/`normal_exposure` accept
+the full RGB aerial image and apply the STOCK's projection - the
+projection is the film's property, not the darkroom's - while
+scalar fields keep meaning already-projected light, so the law
+tests read unchanged.
+
+THE PAYOFF: the first two plate stocks. "manchester" (H&D's
+Manchester Slow, early-plates D1: the complete 14-point 1890
+curve, 0.625-5120 candle-metre-seconds) and "hd22" (D5: the
+unnamed faster plate, 14 points, gamma 1.176 PRINTED by H&D
+themselves - the fit's validator). One candle-metre-second is
+declared ~ one lux-second on the model's absolute axis (D3, with
+the candle's blue-poor caveat recorded); densities are net of fog
+because H&D subtracted the fog strip, so fog=0 honours the
+source's own convention (the silence recorded). Grain is
+BRACKETED, wearing its flag: D19 is a recorded silence, and the
+declared 0.196 um2 is the developed-silver particle class the
+silver print already carries - inside Vitale's modern gelatin
+range and consistent with collodion's microfilm-low granularity -
+a bracket, not a measurement, named as such at the constant.
+A NEW REFEREE reads the plates by H&D's own printed formulas
+(D2): gamma = (D2-D1)/(logE2-logE1) and log-inertia by the
+straight-line intercept, off the MODEL's curve - hd22 must give
+back the printed 1.176, manchester the computed 0.89-0.91 band
+and S = 34/i ~ 5.6 (D4). Collodion refuses by name: lane D holds
+its exposure anchors and its microstructure but no traced curve,
+and a curve invented for a named process is the lie this package
+exists to refuse.
+
+## Organ 3 - reciprocity
+
+`negative`/`normal_exposure` gain `t=None`, the exposure duration
+in seconds. None keeps today's reciprocity-free behaviour,
+declared. With t, the stock's own sheet table (FILM-N13/N14)
+compensates the exposure: H_eff = H * 2^(-comp(t)), comp
+interpolated in log t between the sheet's own rows - TRI-X's
++1/2/3 stops at 1/10/100 s against T-MAX 400's nothing-to-1s, the
+4x spread the dossier called out as per-stock, never shared.
+Outside a sheet's tabulated span the stock REFUSES BY NAME (5222
+is silent beyond 1 s, and silence is not zero). The plates carry
+comp = 0 on H&D's own check (D3: 1/4 candle-metre for 40 s gave
+the density of 1 for 10 s - reciprocity held; their whole axis is
+I*t). The modelled negative is the COMPENSATED one: the sheets
+pair their +stops with development cuts precisely to hold the
+curve's contrast, so applying the exposure term against the
+normal-development curve reproduces the properly-worked negative,
+and the uncompensated contrast rise (which the dossier warns
+about but no sheet quantifies) stays out rather than invented.
+Colour stocks refuse t: no colour lane has delivered a
+reciprocity table yet.
+
+Wiring: develop() gains shutter= (seconds) feeding the film
+stage; goldens re-pin neg:* (the luma placeholder retiring is a
+model correction, the why rides the record) and bake plate and
+shutter rows as new rows.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
