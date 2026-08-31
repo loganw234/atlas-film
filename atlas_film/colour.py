@@ -275,14 +275,69 @@ def _layer_curve(layer, logH):
         0.0, (a - layer["span"]) / layer["ws"])
 
 
-def _develop_layers(rgb, E, stock, pitch_um, grain, seed, label):
+# THE LAYERS TALK (organ 9, layers-talk dossier). Real colour
+# negative layers are not independent: development in one record
+# releases inhibitor that suppresses its neighbours "as a function
+# of the development taking place" there (the founding 1963 DIR
+# patent's own words, O1) - which is why a separation exposure
+# develops STEEPER than a neutral one. The metric three
+# manufacturers share (O3/O4/O8): the separation/neutral gamma
+# ratio, and Kodak's printed conventional-negative control reads
+# R 1.49 / G 1.64 / B 1.50 (O4, Table III, 002(C)). The couplings
+# below are calibrated so each stock's layers read back exactly
+# that triple - A CLASS VALUE, flagged: the coatings measured are
+# Kodak's patent examples, not named stocks, and Kodak's entire
+# customer-facing VISION3 literature never names DIR or interimage
+# (O14's recorded silence), so per-stock triples do not exist to
+# fit. Two brackets ride with it: the published ratios include
+# some mask leak (O8), so a pure-interimage coupling fitted to
+# them slightly OVERSTATES the effect - while our mask lives in
+# the base floors exactly as Kodak's own teaching text says an
+# ideally balanced mask should (O11), keeping the imagewise cross
+# term wholly interimage. The construction is EXACT AT NEUTRAL:
+# the traced characteristic curves are neutral sweeps and remain
+# reproduced bit-for-bit; the correction is a one-step
+# linearisation in the neighbours' developed fractions, declared.
+# Print stocks carry no sourced ratio and get no correction.
+INTERIMAGE = {
+    "50d": (0.5044, 0.6040, 0.6194),
+    "5219": (0.5510, 0.7648, 0.5154),
+    "250d": (0.5758, 0.6015, 0.6114),
+    "200t": (0.5585, 0.7793, 0.5604),
+}
+
+
+def _develop_layers(rgb, E, stock, pitch_um, grain, seed, label,
+                    interimage=True):
     """The three sheets, each exposed through its own sensitivity
-    row and developed on its own crystal field."""
+    row - and, on the stocks whose class carries it, talking to
+    each other through the DIR coupling (organ 9)."""
     rgb = np.maximum(np.asarray(rgb, np.float64), 0.0)
+    ks = INTERIMAGE.get(label) if interimage else None
+    xs, d0 = [], []
+    for layer in stock["layers"]:
+        h = (rgb @ np.asarray(layer["sens"], np.float64)) * E
+        x = np.log10(np.maximum(h, 1e-30))
+        xs.append(x)
+        d0.append(_layer_curve(layer, x))
+    boosts = []
+    for i, layer in enumerate(stock["layers"]):
+        if ks is None:
+            boosts.append(None)
+            continue
+        # the neutral reference: what each neighbour WOULD have
+        # developed had this been a neutral exposure at this
+        # layer's own level - so a neutral scene corrects by
+        # exactly zero and the traced curves stay the source
+        others = [j for j in range(3) if j != i]
+        gap = np.mean(
+            [(_layer_curve(stock["layers"][j], xs[i]) - d0[j])
+             / stock["layers"][j]["span"] for j in others], axis=0)
+        boosts.append(1.0 + ks[i] * gap)
     dyes = []
     for i, layer in enumerate(stock["layers"]):
-        h = (rgb @ np.asarray(layer["sens"], np.float64)) * E
-        d = _layer_curve(layer, np.log10(np.maximum(h, 1e-30)))
+        d = d0[i] if boosts[i] is None else \
+            np.minimum(d0[i] * boosts[i], layer["span"])
         if grain:
             if not pitch_um:
                 raise ValueError(
@@ -316,17 +371,20 @@ def _assemble(dyes, stock):
 
 
 def negative(rgb, E, name, *, pitch_um=None, grain=True, seed=0,
-             t=None):
+             t=None, interimage=True):
     """Expose a colour camera stock and develop it: the negative's
     per-channel Status M density field, mask and all. `t` is the
     exposure duration in seconds - inside the sheet's sourced flat
     span it changes nothing (that flatness is the claim), outside
-    it the stock refuses."""
+    it the stock refuses. `interimage=False` is the kill switch
+    back to independent layers - the declared simplification, kept
+    because the law tests earn their keep there."""
     st = _stock(COLOUR_FILMS, name, "FILM-C")
     if t is not None:
         reciprocity(name, t)
     return _assemble(
-        _develop_layers(rgb, E, st, pitch_um, grain, seed, name), st)
+        _develop_layers(rgb, E, st, pitch_um, grain, seed, name,
+                        interimage=interimage), st)
 
 
 def transmit(D):

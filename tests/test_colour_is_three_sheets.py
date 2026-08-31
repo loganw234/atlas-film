@@ -106,7 +106,12 @@ def test_each_layer_is_its_own_sheet(shelf):
     """Three crystal fields, three seed streams: the grain of the
     R-driven layer must not repeat in the G-driven one - a colour
     print's chromatic grain exists because the layers fluctuate
-    independently."""
+    independently. (This referees the CRYSTAL FIELDS on a fake
+    stock with no interimage constants; the real stocks' MEAN
+    responses deliberately talk through the organ-9 DIR coupling -
+    grain streams stay independent even then, because the
+    inhibitor couples development levels, not the per-crystal
+    luck.)"""
     rgb = np.full((96, 96, 3), 0.05, np.float32)
     d = colour.negative(rgb, 1.0, "fakecolour", pitch_um=2.0, seed=4)
     base = np.asarray(FAKE["base"])

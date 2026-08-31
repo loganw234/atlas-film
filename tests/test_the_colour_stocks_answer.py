@@ -206,6 +206,46 @@ def test_print_film_grain_refuses_by_name():
         colour.positive(t, "2383", grain=True, pitch_um=6.0)
 
 
+def test_the_layers_talk_by_the_printed_ratio():
+    """Organ 9: a separation exposure develops steeper than a
+    neutral one by the conventional-negative gamma ratio Kodak
+    printed (1.49/1.64/1.50, lane O4) - read back through the
+    public surface on every stock that carries the class coupling.
+    Neutral sweeps stay BIT-IDENTICAL to the independent model,
+    because the traced curves are neutral sweeps and remain the
+    source."""
+    xx = np.linspace(-4.5, 1.5, 1201)
+    E = (10.0 ** xx)[:, None, None]
+    grey = np.ones((len(xx), 1, 3))
+    for name, ks in (("50d", None), ("5219", None)):
+        del ks
+        n_on = colour.negative(grey * E, 1.0, name, grain=False)
+        n_off = colour.negative(grey * E, 1.0, name, grain=False,
+                                interimage=False)
+        assert np.array_equal(n_on, n_off)
+    for name in ("50d", "200t"):
+        for ch, want in ((0, 1.49), (1, 1.64), (2, 1.50)):
+            sep = np.zeros((len(xx), 1, 3))
+            sep[:, 0, ch] = 10.0 ** xx
+            base = colour.COLOUR_FILMS[name]["base"][ch]
+            span = colour.COLOUR_FILMS[name]["layers"][ch]["span"]
+            d_on = colour.negative(sep, 1.0, name,
+                                   grain=False)[:, 0, ch] - base
+            d_off = colour.negative(sep, 1.0, name, grain=False,
+                                    interimage=False)[:, 0, ch] \
+                - base
+
+            def chord(y):
+                lo = int(np.searchsorted(y, 0.25 * span))
+                hi = int(np.searchsorted(y, 0.75 * span))
+                hi = min(max(hi, lo + 2), len(xx) - 1)
+                return float((y[hi] - y[lo]) / (xx[hi] - xx[lo]))
+
+            ratio = chord(np.asarray(d_on, np.float64)) \
+                / chord(np.asarray(d_off, np.float64))
+            assert abs(ratio - want) < 0.10, (name, ch, ratio)
+
+
 def test_the_colour_clocks_hold_flat_and_refuse_the_dark():
     """Lane J: every VISION3 sheet claims flatness over 1/1000-1 s,
     so an in-span t must change NOTHING - bit-identical is the
