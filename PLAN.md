@@ -157,6 +157,24 @@ through the chain; the enlargement bookkeeping (negative pitch vs
 print pitch, both grains at their own scales). Golden rows for the
 chain bake as new rows; no existing pin moves.
 
+*Landed 2026-08-31, same day as planned, in four commits. The
+mechanism first with the real stocks refusing their curves by name;
+then the sensitometry lane (film-stocks dossier, 16 entries, the
+read-off method validated by Double-X's printed gammas) and the
+constants as its verdicts - with the curve family changed to
+sensitometry's own on the way, because a camera negative holds
+H&D's straight line for three decades and the print family cannot.
+What was never fit emerged as the referees: trix's chord reads
+0.564 against Kodak's printed CI aim of 0.56, and all four speed
+points land within 0.04 log H of where ISO 6 puts their rated
+speeds - the datasheet axes are absolute lux-seconds, so the model
+meters cameras in real units by each stock's own curve. The chain
+wired through develop(film=) with the double inversion, re-metering,
+enlargement bookkeeping and no-sibling refusal all asserted, three
+golden rows pinned, twenty untouched. Still open here: organs 3 and
+4 now have their home at this stage, wet/dry plate stocks are
+wanted sources, and the enlarger is ideal by declaration.*
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
