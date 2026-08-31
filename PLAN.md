@@ -378,6 +378,45 @@ conversion, flagged) agrees with Towler's 1864 field exposures
 within a stop. Reciprocity refuses (nothing sourced); ci refuses
 (the mechanism, above); intensification is the named future dial.
 
+## Organ 5b - the intensifier's bath
+
+Collodion's real contrast dial (developer-hand I17): metol-silver
+physical intensification, the operation D16 established as
+ROUTINE practice, not remedy. The model: intensification deposits
+silver on the developed image, so the output density field -
+grain and all - multiplies by a factor; crystal statistics are
+untouched because the crystals were already developed when the
+bath touched them. The factor ships for the PICTORIAL recipe
+only: intensify="1:10" multiplies by 2.6/1.57 = 1.656, the
+sourced Dmax ratio, and the REFEREE is that the same factor must
+reproduce the printed gradient endpoint (0.85 x 1.656 = 1.41
+against the printed 1.37 - within 3%, two printed numbers, one
+factor). The 1:5 line-work regime REFUSES BY SHAPE: the source
+reports it straightens the curve ("a satisfactory, long linear
+relationship without a sharp shoulder") and a pure scale cannot
+honestly represent a shape change - it waits for a traced
+intensified curve. Non-collodion stocks refuse by name (the dry
+plates were mercury-intensified in period, Q 1.9 in Mees's table,
+but no lane has traced what mercury does to THEIR curves).
+"Intensification results in higher granularity" (I17) becomes an
+EMERGENT PREDICTION rather than a dial: multiplying the developed
+density field multiplies its grain sigma by the same factor.
+
+## The enlarger's lens
+
+The last ideal stage of the enlarger, closed with the same
+declared physics the camera already carries: enlarger_fstop= and
+enlarger_diffraction= apply the Airy blur to the PRINTING LIGHT
+at the print's own pitch (the negative's pitch times the
+enlargement), exactly as the camera dials apply it to the aerial
+image at the negative's pitch. Off by default and off is not a
+lie - an ideal enlarger lens is an honest instrument, the same
+argument develop() has always made for the camera. No new
+constants: diffraction is the optics dossiers' physics, reused at
+the second lens position. Aberrated/traced enlarger lenses ride
+atlas-optical's existing machinery when wanted; the darkroom
+stage only owns the aperture.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
