@@ -32,7 +32,8 @@ from atlas_film import emulsion, films
 from atlas_film.processes import KAPPA
 
 TEST_STOCK = dict(fog=0.2, dmax=2.0, gamma=0.6, ht=-2.0, wt=0.2,
-                  ws=0.35, grain_um2=1.0)
+                  ws=0.35, grain_um2=1.0,
+                  sens=(1 / 3, 1 / 3, 1 / 3))
 PITCH = 2.0
 
 
