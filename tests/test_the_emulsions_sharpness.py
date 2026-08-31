@@ -22,18 +22,24 @@ def sine_response(name, f_cycles_mm, pitch_um=1.0, n=2048):
     shallow sine about mid-scale, response from the density swing
     ratioed against a near-zero-frequency reference."""
     x = np.arange(n) * pitch_um / 1000.0          # mm
-    # the reference sits at 1 full cycle across the window - low
-    # enough that M ~ 1, high enough that max-min reads a swing
-    f_ref = 1000.0 / (n * pitch_um)
+    # lock-in on the central half: max-min would read the pad
+    # ripple as signal at high frequency; the quadrature product
+    # reads only the sine that was sent
+    f_ref = 4000.0 / (n * pitch_um)
     E = films.normal_highlight(name) / 0.5 * 0.3   # mid straight line
-    swings = {}
+    lo, hi = n // 4, 3 * n // 4
+    amps = {}
     for f in (f_cycles_mm, f_ref):
         img = 0.5 + 0.05 * np.sin(2 * np.pi * f * x)
         field = np.tile(img, (8, 1))
-        d = films.negative(field, E, name, grain=False,
-                           pitch_um=pitch_um)
-        swings[f] = float(d[4].max() - d[4].min())
-    return swings[f_cycles_mm] / swings[f_ref]
+        d = np.asarray(films.negative(field, E, name, grain=False,
+                                      pitch_um=pitch_um),
+                       np.float64)
+        row = d[4, lo:hi] - d[4, lo:hi].mean()
+        s = np.sin(2 * np.pi * f * x[lo:hi])
+        c = np.cos(2 * np.pi * f * x[lo:hi])
+        amps[f] = 2.0 * float(np.hypot(row @ s, row @ c)) / (hi - lo)
+    return amps[f_cycles_mm] / amps[f_ref]
 
 
 def test_the_traced_curve_reads_back_by_sine():
