@@ -503,6 +503,53 @@ def reciprocity(name, t):
     return float(np.interp(np.log10(t), lt, [r[1] for r in rows]))
 
 
+# THE BATCH LOTTERY AND THE POURING FIELD (era-look, early-plates
+# D10). A period dry plate was not a reference specimen: the same
+# boxed product moved actinograph speed 7 to 18 between purchases
+# ("without the slightest notification of alteration"), and one
+# supposedly uniform strip varied D 1.335 to 0.820 across its own
+# width - one part passing three times the light of another.
+# `batch=` is the box you bought, an integer: it draws a
+# deterministic speed shift inside the sourced order-of-magnitude
+# bracket of +/-1 stop, and lays the hand that coated the plate -
+# a smooth low-frequency pouring field multiplying the developed
+# density (grain with it, like the intensifier's bath) at the
+# sourced strip's worst-case relative amplitude, 0.24 about the
+# mean. THE METER DOES NOT KNOW THE BATCH: the photographer rated
+# the plate at its nominal speed and the box betrayed them, which
+# is the era experience this dial exists to reproduce. Plates
+# only: the Kodak stocks' machine coating has no sourced variance,
+# collodion's pour is not in the record, and both refuse by name.
+_BATCH_STOPS = 1.0          # D10: order-of-magnitude, +/-1 stop
+_POUR_AMPLITUDE = 0.24      # D10 p.198: D 0.820..1.335 about 1.08
+
+
+def _batch_draw(name, batch, shape):
+    """The box and the hand: (speed shift in stops, pouring field
+    over `shape`), both deterministic in the batch number."""
+    if name not in ("manchester", "hd22"):
+        raise ValueError(
+            f"{name!r} has no sourced batch variance: the era's "
+            "lottery is the dry plates' (early-plates D10) - "
+            "Kodak's machine coating and collodion's pour are not "
+            "in the record, and a lottery invented for them would "
+            "be noise wearing a source's name")
+    rng = np.random.default_rng(
+        np.random.SeedSequence([0x1890, int(batch)]))
+    shift = float(rng.uniform(-_BATCH_STOPS, _BATCH_STOPS))
+    yy, xx = np.meshgrid(np.linspace(0.0, 1.0, shape[0]),
+                         np.linspace(0.0, 1.0, shape[1]),
+                         indexing="ij")
+    field = np.zeros(shape, np.float64)
+    for _ in range(3):
+        fx, fy = rng.uniform(0.5, 2.0, 2)
+        ph = rng.uniform(0.0, 2.0 * np.pi, 2)
+        field += np.cos(2 * np.pi * fx * xx + ph[0]) \
+            * np.cos(2 * np.pi * fy * yy + ph[1])
+    peak = float(np.abs(field).max())
+    return shift, 1.0 + _POUR_AMPLITUDE * field / max(peak, 1e-12)
+
+
 # THE INTENSIFIER'S BATH (organ 5b, developer-hand I17): collodion's
 # real contrast dial. Physical intensification deposits silver ON
 # the developed image, so the whole output field - grain included -
@@ -544,7 +591,8 @@ def _intensify_factor(name, intensify):
 
 
 def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
-             sheet=None, t=None, ci=None, intensify=None):
+             sheet=None, t=None, ci=None, intensify=None,
+             batch=None):
     """Expose a camera stock to the aerial image and develop it.
 
     `img` is the aerial image - a (..., 3) RGB field collapses
@@ -571,10 +619,16 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     st = _stock(name)
     f = _intensify_factor(name, intensify)
     dose = np.maximum(_project(img, st) * E, 0.0)
+    pour = None
+    if batch is not None:
+        shift, pour = _batch_draw(name, batch, dose.shape)
+        dose = dose * 2.0 ** shift
     if t is not None:
         dose = dose * 2.0 ** -reciprocity(name, t)
     D = characteristic(np.log10(np.maximum(dose, 1e-30)), name,
                        ci=ci)
+    if pour is not None:
+        f = f * pour
     if not grain:
         return (D * f).astype(np.float32)
     p = D / st["dmax"]

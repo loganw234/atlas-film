@@ -128,6 +128,69 @@ def test_the_plate_grain_is_bracketed_but_counts():
 
 # ---------------------------------------------------- the clock
 
+# ------------------------------------ the batch and the pour
+
+def test_the_batch_lottery_is_deterministic_and_bounded():
+    """The box you bought: same batch, same plate, bit-identical;
+    different batches differ; the speed shift stays inside D10's
+    sourced +/-1 stop bracket."""
+    grey = np.full((32, 32, 3), 0.4)
+    E = films.normal_exposure(grey, "manchester")
+    a = films.negative(grey, E, "manchester", grain=False, batch=7)
+    b = films.negative(grey, E, "manchester", grain=False, batch=7)
+    c = films.negative(grey, E, "manchester", grain=False, batch=8)
+    assert np.array_equal(a, b)
+    assert not np.array_equal(a, c)
+    # bound: even at the bracket's edge the flat-field density
+    # stays within what a +/-1 stop dose shift times the pouring
+    # amplitude can reach from the reference
+    ref = films.negative(grey, E, "manchester", grain=False)
+    hi = films.negative(grey, E * 2.0, "manchester", grain=False)
+    lo = films.negative(grey, E * 0.5, "manchester", grain=False)
+    for n in range(12):
+        d = films.negative(grey, E, "manchester", grain=False,
+                           batch=n)
+        assert float(d.max()) <= float(hi.max()) * 1.25 + 1e-6
+        assert float(d.min()) >= float(lo.min()) * 0.75 - 1e-6
+    assert ref.shape == d.shape
+
+
+def test_the_pouring_field_is_smooth_and_sourced_in_amplitude():
+    """One hand poured the plate: a uniform exposure develops to a
+    smoothly varying density whose relative spread stays inside
+    the sourced strip's 0.24 about the mean - and the grain rides
+    the coating, thicker where more was poured."""
+    grey = np.full((64, 64, 3), 0.4)
+    E = films.normal_exposure(grey, "manchester")
+    d = films.negative(grey, E, "manchester", grain=False, batch=3)
+    mean = float(d.mean())
+    rel = (np.asarray(d, np.float64) - mean) / mean
+    assert 0.05 < float(np.abs(rel).max()) <= 0.25
+    # smooth: the steepest neighbouring step is a small fraction
+    # of the field's full spread (at most ~2 cycles across the
+    # plate, so a 64 px width crosses a cycle in ~32 steps)
+    g = float(np.abs(np.diff(np.asarray(d, np.float64),
+                             axis=0)).max())
+    spread = float(d.max() - d.min())
+    assert g < spread * 0.2
+
+
+def test_the_meter_does_not_know_the_batch():
+    """The era experience: the photographer rated the plate at its
+    nominal speed. The meter carries no batch parameter at all -
+    this asserts the signature stays honest."""
+    import inspect
+    sig = inspect.signature(films.normal_exposure)
+    assert "batch" not in sig.parameters
+
+
+def test_the_lottery_refuses_what_has_no_source():
+    grey = np.full((4, 4, 3), 0.3)
+    for name in ("trix", "collodion", "tmax100"):
+        with pytest.raises(ValueError, match="lottery|variance"):
+            films.negative(grey, 1.0, name, grain=False, batch=1)
+
+
 def test_reciprocity_reads_each_sheet():
     assert films.reciprocity("trix", 1.0) == 1.0
     assert films.reciprocity("trix", 100.0) == 3.0
