@@ -87,3 +87,46 @@ def test_collodion_is_blue_blind_and_grainy():
 def test_collodion_refuses_the_clock():
     with pytest.raises(ValueError, match="no reciprocity table"):
         films.reciprocity("collodion", 15.0)
+
+
+# ---------------------------------------- the intensifier's bath
+
+def test_the_bath_reproduces_both_printed_endpoints():
+    """One factor, two printed numbers (I17): the 1:10 Dmax ratio
+    2.6/1.57 must also carry the gradient 0.85 to the printed 1.37
+    within the source's own consistency (3%)."""
+    f = films.INTENSIFIERS["1:10"]
+    assert abs(f * 1.57 - 2.6) < 1e-12
+    assert abs(f * 0.85 - 1.37) < 0.05
+    x = np.array([1.1, 1.3])
+    d0 = films.characteristic(x, "collodion")
+    d1 = films.negative(10.0 ** x, 1.0, "collodion", grain=False,
+                        intensify="1:10")
+    assert np.allclose(d1, d0 * f, atol=1e-6)
+
+
+def test_intensification_amplifies_the_grain_it_touches():
+    """The bath multiplies developed silver, so grain sigma scales
+    by the same factor - I17's 'higher granularity' as an emergent
+    prediction, not a dial."""
+    blue = np.full((96, 96, 3), 0.5)
+    E = films.normal_exposure(blue, "collodion")
+    a = films.negative(blue, E, "collodion", pitch_um=2.0, seed=4)
+    b = films.negative(blue, E, "collodion", pitch_um=2.0, seed=4,
+                       intensify="1:10")
+    f = films.INTENSIFIERS["1:10"]
+    assert np.allclose(b, a * np.float32(f), rtol=1e-5)
+    assert float(b.std()) > float(a.std()) * 1.5
+
+
+def test_the_bath_refuses_what_it_cannot_hold():
+    grey = np.full((2, 2, 3), 0.3)
+    with pytest.raises(ValueError, match="shoulder"):
+        films.negative(grey, 1.0, "collodion", grain=False,
+                       intensify="1:5")
+    with pytest.raises(ValueError, match="mercury"):
+        films.negative(grey, 1.0, "manchester", grain=False,
+                       intensify="1:10")
+    with pytest.raises(ValueError, match="sourced recipe"):
+        films.negative(grey, 1.0, "collodion", grain=False,
+                       intensify="1:7")

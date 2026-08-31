@@ -416,8 +416,48 @@ def reciprocity(name, t):
     return float(np.interp(np.log10(t), lt, [r[1] for r in rows]))
 
 
+# THE INTENSIFIER'S BATH (organ 5b, developer-hand I17): collodion's
+# real contrast dial. Physical intensification deposits silver ON
+# the developed image, so the whole output field - grain included -
+# multiplies; the crystals were already developed when the bath
+# touched them, so the counting statistics are untouched and
+# "intensification results in higher granularity" (I17) EMERGES
+# rather than being dialled. The pictorial 1:10 recipe at 180 s
+# ships as the sourced Dmax ratio 2.6/1.57 = 1.656, refereed
+# against the second printed number: 0.85 x 1.656 = 1.41 vs the
+# printed gradient 1.37, within 3%. The 1:5 line-work regime
+# refuses by SHAPE - the source says it straightens the shoulder,
+# and a pure scale cannot honestly represent a shape change.
+INTENSIFIERS = {"1:10": 2.6 / 1.57}
+
+
+def _intensify_factor(name, intensify):
+    if intensify is None:
+        return 1.0
+    st = _stock(name)
+    if "curve" not in st:
+        raise ValueError(
+            f"{name!r} has no intensification model: metol-silver "
+            "is the wet plate's bath (the dry plates were "
+            "mercury-intensified in period, but no lane has traced "
+            "what mercury does to their curves)")
+    if intensify == "1:5":
+        raise ValueError(
+            "the 1:5 line-work intensification straightens the "
+            "curve's shoulder (developer-hand I17: 'a satisfactory, "
+            "long linear relationship') - a shape change no scale "
+            "factor honestly represents; it waits for a traced "
+            "intensified curve")
+    if intensify not in INTENSIFIERS:
+        raise ValueError(
+            f"intensify {intensify!r} is not a sourced recipe: "
+            + ", ".join(sorted(INTENSIFIERS))
+            + " (metol-silver, 180 s, JIST 1998)")
+    return INTENSIFIERS[intensify]
+
+
 def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
-             sheet=None, t=None, ci=None):
+             sheet=None, t=None, ci=None, intensify=None):
     """Expose a camera stock to the aerial image and develop it.
 
     `img` is the aerial image - a (..., 3) RGB field collapses
@@ -436,16 +476,20 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     own sheet at the negative's `pitch_um`, the curve read as the
     developable fraction p = D/dmax, fog crystals included; a
     stored sheet from `emulsion.coat` prints identically via
-    `sheet=`.
+    `sheet=`. `intensify` (organ 5b) is the wet plate's bath: the
+    developed field - grain and all - multiplies by the sourced
+    recipe's factor, applied LAST because the bath touches silver
+    the developer already made.
     """
     st = _stock(name)
+    f = _intensify_factor(name, intensify)
     dose = np.maximum(_project(img, st) * E, 0.0)
     if t is not None:
         dose = dose * 2.0 ** -reciprocity(name, t)
     D = characteristic(np.log10(np.maximum(dose, 1e-30)), name,
                        ci=ci)
     if not grain:
-        return D.astype(np.float32)
+        return (D * f).astype(np.float32)
     p = D / st["dmax"]
     if not pitch_um:
         raise ValueError(
@@ -463,7 +507,8 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     else:
         n = emulsion.expose(p, float(st["dmax"]), st["grain_um2"],
                             float(pitch_um), seed, label=name)
-    return ((KAPPA * st["grain_um2"] / area) * n).astype(np.float32)
+    return (f * (KAPPA * st["grain_um2"] / area) * n).astype(
+        np.float32)
 
 
 def normal_exposure(img, name, percentile=99.5, t=None, ci=None):
