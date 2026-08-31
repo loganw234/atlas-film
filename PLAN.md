@@ -232,6 +232,10 @@ existing moves. Refusals everywhere constants are missing, by name.
 
 *Landed (organ 7 constants, 2026-08-31): 50d and 5219 by layer
 family fits (assembly vs traced curves: worst 0.046 / 0.036 D);
+250d and 200t the same day when the FILM-E lane returned (worst
+0.022 / 0.029 D - the whole current Vision3 line is now on the
+shelf, granularity-equivalent areas from the traced rms plates,
+200t's red figure flagged as the dossier's weakest);
 2383 by sampled layer tables - at gamma five the family missed the
 printer-light criterion sixfold, and the traced geometry is the
 source, so the layers carry it directly (worst 0.003 log H = 0.12

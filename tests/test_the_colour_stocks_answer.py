@@ -35,6 +35,23 @@ TRACED_5219 = [
     (-0.5, 1.37, 1.97, 2.18), (0.0, 1.58, 2.22, 2.43),
     (0.5, 1.76, 2.43, 2.63), (1.0, 1.86, 2.56, 2.75)]
 
+# KODAK VISION3 250D 5207 (lane E: raster/vector two-method
+# agreement <= 0.003 D on the floors)
+TRACED_250D = [
+    (-3.700, 0.177, 0.577, 0.843), (-3.100, 0.208, 0.610, 0.867),
+    (-2.500, 0.346, 0.766, 1.003), (-1.900, 0.606, 1.068, 1.319),
+    (-1.300, 0.891, 1.402, 1.641), (-0.700, 1.177, 1.737, 1.963),
+    (-0.100, 1.455, 2.066, 2.284), (0.500, 1.694, 2.358, 2.562),
+    (1.100, 1.843, 2.553, 2.732)]
+
+# KODAK VISION3 200T 5213 (lane E)
+TRACED_200T = [
+    (-3.684, 0.178, 0.580, 0.847), (-3.084, 0.194, 0.596, 0.864),
+    (-2.484, 0.300, 0.711, 0.979), (-1.884, 0.570, 1.024, 1.277),
+    (-1.284, 0.859, 1.363, 1.600), (-0.684, 1.145, 1.696, 1.920),
+    (-0.084, 1.426, 2.029, 2.240), (0.516, 1.672, 2.328, 2.526),
+    (1.116, 1.824, 2.527, 2.708)]
+
 # KODAK VISION Premier 2383, traced as log H AT density (the curve
 # is near-vertical: reading the figure the other way round would
 # multiply the read-off error by gamma five), Status A per channel
@@ -65,7 +82,8 @@ def assemble_at(name, x):
 
 
 @pytest.mark.parametrize("name,traced,tol", [
-    ("50d", TRACED_50D, 0.05), ("5219", TRACED_5219, 0.05)])
+    ("50d", TRACED_50D, 0.05), ("5219", TRACED_5219, 0.05),
+    ("250d", TRACED_250D, 0.03), ("200t", TRACED_200T, 0.035)])
 def test_negative_reassembles_its_datasheet(name, traced, tol):
     x = np.array([p[0] for p in traced])
     want = np.array([p[1:] for p in traced])

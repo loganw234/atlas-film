@@ -113,6 +113,39 @@ COLOUR_FILMS = {
                  sens=(0.0, 0.0, 1.0), dye=(0.0101, 0.1212, 1.0),
                  grain_um2=1.504),
         )),
+    # KODAK VISION3 250D 5207 (FILM-E lane, H-1-5207 March 2026 +
+    # brochure vector twin; assembly vs traced curves worst 0.022 D;
+    # granularity B 13.4 / G 6.3 / R 5.4 at net D 1.0, 48 um)
+    "250d": dict(
+        base=(0.176, 0.577, 0.843),
+        layers=(
+            dict(gamma=0.475, ht=-2.70, wt=0.32, ws=0.30, span=1.641,
+                 sens=(1.0, 0.0, 0.0), dye=(1.0, 0.1139, 0.0890),
+                 grain_um2=0.122),
+            dict(gamma=0.60, ht=-2.56, wt=0.44, ws=0.60, span=2.026,
+                 sens=(0.0, 1.0, 0.0), dye=(0.0908, 1.0, -0.0173),
+                 grain_um2=0.165),
+            dict(gamma=0.55, ht=-2.66, wt=0.32, ws=0.30, span=1.926,
+                 sens=(0.0, 0.0, 1.0), dye=(-0.0030, 0.0644, 1.0),
+                 grain_um2=0.748),
+        )),
+    # KODAK VISION3 200T 5213 (FILM-E lane, H-1-5213 March 2026;
+    # assembly worst 0.029 D; granularity B 15.4 / G 6.4 / R ~5.2 -
+    # the R figure is the dossier's weakest number, recovered
+    # cross-plate because the brochure omits the red curve (E13)
+    "200t": dict(
+        base=(0.178, 0.580, 0.847),
+        layers=(
+            dict(gamma=0.50, ht=-2.58, wt=0.32, ws=0.30, span=1.680,
+                 sens=(1.0, 0.0, 0.0), dye=(1.0, 0.1340, 0.0830),
+                 grain_um2=0.113),
+            dict(gamma=0.525, ht=-2.56, wt=0.32, ws=0.30, span=1.809,
+                 sens=(0.0, 1.0, 0.0), dye=(0.0542, 1.0, 0.0184),
+                 grain_um2=0.171),
+            dict(gamma=0.525, ht=-2.60, wt=0.28, ws=0.30, span=1.837,
+                 sens=(0.0, 0.0, 1.0), dye=(0.0, 0.0374, 1.0),
+                 grain_um2=0.988),
+        )),
 }
 
 # print stocks share the structure; their `lad_aim` is the published
