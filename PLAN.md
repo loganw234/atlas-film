@@ -431,6 +431,55 @@ with the contrast criterion as validation. Eleven B&W stocks,
 four colour negatives, one print stock, three plates-era media.
 117 tests; 40 golden prints.*
 
+## The structural campaign - sharpness, glare, and the layers talking
+
+Three lanes dispatched 2026-08-31 against the three structural
+gaps, landing in order of weight:
+
+**Organ 8 - the emulsion's sharpness (MTF).** The sheets publish
+modulation-transfer curves for every Kodak stock on the shelf and
+the lane traces them (vector where the art allows, calibrated,
+residuals stated - the developer-hand method). The organ:
+`negative` convolves the aerial image with a kernel whose MTF
+matches the stock's traced curve at the negative's pitch - the
+emulsion's turbidity made spatial, the same declared-physics
+pattern as the enlarger's Airy blur. Adjacency lift (MTF above
+100% at low frequency) is real physics the trace must keep, and
+the kernel family must be able to hold it (a difference-of-
+gaussians, not a single blur). Stocks whose sheets print no MTF
+refuse by name. Default ON once landed? No - sharpness belongs to
+honesty: on by default at the film stage, with a kill switch,
+because a pixel-perfect emulsion is the lie now.
+
+**The era-look organs.** Landing NOW from sources already in hand
+(early-plates D10): the plates' BATCH LOTTERY - the same boxed
+product moved actinograph speed 7 to 18 between purchases, so
+`batch=` (an integer, the box you bought) draws a deterministic
+speed shift within the sourced order-of-magnitude bracket of
++/-1 stop, and the METER DOES NOT KNOW - the photographer rated
+the plate at its nominal speed and the batch betrayed them,
+which is the era experience the dial exists to reproduce. The
+same hand poured the coating: D10's p. 198 strip varied D 1.335
+to 0.820 across one supposedly uniform plate, so the same batch
+seed lays a smooth low-frequency POURING FIELD that multiplies
+the developed density (and its grain with it, like the
+intensifier's bath) at the sourced worst-case amplitude. Plates
+only: the Kodak stocks' machine coating has no sourced variance,
+collodion's pour is not in the record, and both refuse by name.
+VEILING FLARE waits on lane M's numbers: the organ will be a
+sourced flare fraction added to the aerial image before the
+film stage - uncoated-era glass lifting every shadow - with the
+era classes the lane returns.
+
+**Organ 9 - interimage (the layers talk).** Lane O hunts the
+quantitative form: DIR-coupler cross-layer development coupling,
+ideally a printed gamma matrix or single-channel-exposure curves
+for a real stock. If the magnitude cannot be sourced, the organ
+lands as a named refusal with the mechanism banked - the current
+independent-layer model is the declared simplification either
+way, and the referee that asserts layer independence gets a
+comment naming what real film deliberately violates.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
