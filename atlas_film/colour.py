@@ -204,6 +204,45 @@ PRINT_FILMS = {
 # (FILM-P lane: Kodak's Laboratory Aim Density control method)
 LAD_NEGATIVE = (0.80, 1.20, 1.60)
 
+# THE COLOUR CLOCKS (colour-clocks dossier, lane J). Every VISION3
+# sheet prints the same sentence: no corrections from 1/1000 s to
+# 1 s - a tolerance claim, flat by Kodak's own word, and the WHOLE
+# of the sheets' reciprocity content (J5: no table, no long-
+# exposure clause exists). The print stock holds its own, wider
+# domain: 1/10 s to almost 1/3000 s "with little or no change in
+# tone scale" (J13, stable 2005-2026). The two domains must not
+# share parameters, and beyond a span the stock refuses - the 1 s
+# bound is the edge of the sourced region, not a measured knee.
+# PUSH is deliberately NOT a dial here: Kodak's own page says push
+# recovers under 1/3 stop at Push 1 and "is not recommended as a
+# means to increase photographic speed" (J8), the sheets warn LAD
+# aims do not hold under push (J6) - the model's own printing
+# anchor - and the per-layer contrast slopes are sourced only for
+# 5213 over +/-20 s in control-strip units no lane has converted.
+# The data is banked; the dial waits.
+RECIPROCITY_SPANS = {
+    "50d": (1e-3, 1.0), "5219": (1e-3, 1.0),
+    "250d": (1e-3, 1.0), "200t": (1e-3, 1.0),
+    "2383": (1.0 / 3000.0, 0.1),
+}
+
+
+def reciprocity(name, t):
+    """Validate an exposure time against the stock's sourced flat
+    span and return its compensation: zero inside (flat is the
+    sheets' own claim), a refusal outside (silence is not zero)."""
+    if name not in RECIPROCITY_SPANS:
+        raise ValueError(
+            f"no reciprocity statement for {name!r} is on the "
+            "shelf")
+    lo, hi = RECIPROCITY_SPANS[name]
+    if not lo <= float(t) <= hi:
+        raise ValueError(
+            f"{name}'s sheet is silent outside {lo:g}..{hi:g} s "
+            f"({t:g} s asked) - the span's edge is the edge of the "
+            "sourced region, not a measured knee")
+    return 0.0
+
 
 def _stock(table, name, lane):
     if name not in table:
@@ -276,10 +315,16 @@ def _assemble(dyes, stock):
     return out
 
 
-def negative(rgb, E, name, *, pitch_um=None, grain=True, seed=0):
+def negative(rgb, E, name, *, pitch_um=None, grain=True, seed=0,
+             t=None):
     """Expose a colour camera stock and develop it: the negative's
-    per-channel Status M density field, mask and all."""
+    per-channel Status M density field, mask and all. `t` is the
+    exposure duration in seconds - inside the sheet's sourced flat
+    span it changes nothing (that flatness is the claim), outside
+    it the stock refuses."""
     st = _stock(COLOUR_FILMS, name, "FILM-C")
+    if t is not None:
+        reciprocity(name, t)
     return _assemble(
         _develop_layers(rgb, E, st, pitch_um, grain, seed, name), st)
 
@@ -357,11 +402,16 @@ def _solve_lights(t_patch, print_name):
 
 
 def positive(neg_T, name, *, lights=(1.0, 1.0, 1.0), pitch_um=None,
-             grain=False, seed=0):
+             grain=False, seed=0, t=None):
     """Print through the negative: the print film's three layers
     exposed by transmitted light times the printer's per-channel
-    lights, assembled to the PRINT's density field."""
+    lights, assembled to the PRINT's density field. `t` is the
+    printer's exposure time - the print stock holds its own flat
+    reciprocity domain (1/3000 to 1/10 s), distinct from the
+    camera stocks', and refuses outside it."""
     pf = _stock(PRINT_FILMS, name, "FILM-P")
+    if t is not None:
+        reciprocity(name, t)
     light = np.asarray(neg_T, np.float64) * np.asarray(lights,
                                                        np.float64)
     return _assemble(
@@ -369,15 +419,19 @@ def positive(neg_T, name, *, lights=(1.0, 1.0, 1.0), pitch_um=None,
         pf)
 
 
-def normal_exposure(lum, name, percentile=90.0):
+def normal_exposure(lum, name, percentile=90.0, t=None):
     """The colour camera's meter, anchored where the laboratories
     anchor: E such that the scene's highlight-referenced grey (18%
     of the bright decile) develops to the negative's green-channel
     LAD aim. The same discipline as lad_lights, pointed at the
-    camera instead of the printer."""
+    camera instead of the printer. `t` validates against the
+    sheet's flat span and adds nothing inside it - the flatness is
+    the sheet's own claim."""
     if LAD_NEGATIVE is None:
         raise ValueError("the LAD negative aims have not landed")
     _stock(COLOUR_FILMS, name, "FILM-C")
+    if t is not None:
+        reciprocity(name, t)
     ref = 0.18 * float(np.percentile(
         np.asarray(lum, np.float64).max(axis=-1)
         if np.ndim(lum) == 3 else np.asarray(lum, np.float64),

@@ -204,3 +204,28 @@ def test_print_film_grain_refuses_by_name():
     t = np.full((2, 2, 3), 0.1)
     with pytest.raises(ValueError, match="granularity-equivalent"):
         colour.positive(t, "2383", grain=True, pitch_um=6.0)
+
+
+def test_the_colour_clocks_hold_flat_and_refuse_the_dark():
+    """Lane J: every VISION3 sheet claims flatness over 1/1000-1 s,
+    so an in-span t must change NOTHING - bit-identical is the
+    claim - and beyond the span the stock refuses, because the 1 s
+    edge is the edge of the sourced region, not a knee. The print
+    stock holds its own, different domain."""
+    grey = np.full((4, 4, 3), 0.18)
+    E = colour.normal_exposure(np.full((8, 8, 3), 1.0), "50d")
+    a = colour.negative(grey, E, "50d", grain=False)
+    b = colour.negative(grey, E, "50d", grain=False, t=0.02)
+    assert np.array_equal(a, b)
+    for name, bad in (("50d", 2.0), ("5219", 1e-4),
+                      ("200t", 30.0), ("250d", 5e-4)):
+        with pytest.raises(ValueError, match="silent outside"):
+            colour.negative(grey, E, name, grain=False, t=bad)
+    tt = 10.0 ** -np.asarray(colour.LAD_NEGATIVE, np.float64)
+    p = colour.positive(tt[None, None, :], "2383", t=0.02)
+    q = colour.positive(tt[None, None, :], "2383")
+    assert np.array_equal(p, q)
+    with pytest.raises(ValueError, match="silent outside"):
+        colour.positive(tt[None, None, :], "2383", t=0.5)
+    with pytest.raises(ValueError, match="silent outside"):
+        colour.positive(tt[None, None, :], "2383", t=1e-4)
