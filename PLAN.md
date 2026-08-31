@@ -417,6 +417,20 @@ the second lens position. Aberrated/traced enlarger lenses ride
 atlas-optical's existing machinery when wanted; the darkroom
 stage only owns the aperture.
 
+*Landed 2026-08-31, the closing sweep: organ 5b's 1:10 bath
+(factor 1.656, two printed endpoints, grain amplification
+emergent) with the enlarger's lens beside it in the darkroom
+(working aperture N(1+m), the f/128 golden lesson); the colour
+clocks (every VISION3 sheet's flat 1/1000-1 s span refusing
+beyond, the print stock's own 1/3000-1/10 s domain, push declined
+with Kodak's own under-a-third-stop correction banked); and FOUR
+MORE SHEETS as traced tables - Plus-X emerging on the ISO axis at
++0.017 while P3200's artwork sits 2.3 stops off its own EI
+(re-anchored, labelled), the Ilfords anchored by explicit offsets
+with the contrast criterion as validation. Eleven B&W stocks,
+four colour negatives, one print stock, three plates-era media.
+117 tests; 40 golden prints.*
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
