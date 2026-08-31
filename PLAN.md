@@ -323,6 +323,15 @@ stage; goldens re-pin neg:* (the luma placeholder retiring is a
 model correction, the why rides the record) and bake plate and
 shutter rows as new rows.
 
+*Landed 2026-08-31, same day (atlas-film "the sheet gains an eye
+and a clock"; darkroom wiring beside it): hd22's chord read back
+1.165 against H&D's printed 1.176; manchester in the 0.89-0.91
+band, S = 34/i 5.9 against the plate's 5.6; red-vs-grey splits
+0.58 D on a plate and 0.00000 on TRI-X; meter and film cancel
+bit-identically and the golden row pins the cancellation. 88
+tests. Record: darkroom
+docs/test-records/2026-08-31-the-eye-and-the-clock.md.*
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
