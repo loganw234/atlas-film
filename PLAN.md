@@ -230,6 +230,22 @@ a colour negative through its transmitted luminance (a real
 practice, declared as such). Golden rows bake as new rows; nothing
 existing moves. Refusals everywhere constants are missing, by name.
 
+*Landed (organ 7 constants, 2026-08-31): 50d and 5219 by layer
+family fits (assembly vs traced curves: worst 0.046 / 0.036 D);
+2383 by sampled layer tables - at gamma five the family missed the
+printer-light criterion sixfold, and the traced geometry is the
+source, so the layers carry it directly (worst 0.003 log H = 0.12
+printer lights at all 27 traced points; construction declared in
+the constants comment). LAD on both ends, grey-card trim beside
+it, colour meter anchored on the G aim. One finding recorded: both
+Vision3 stocks trace a B channel ~0.2 D thinner over G than
+H-61A's nominal patch spacing - film greys print warm at pure LAD
+lights; the B traces deserve a re-adjudication lane. Print-film
+grain refuses by name (2383 publishes no rms curve; the FILM-F
+lane's measured 1.25-4 um dye clouds in chromogenic PAPERS now
+corroborate the negatives' granularity-equivalent areas from one
+rung down).*
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet

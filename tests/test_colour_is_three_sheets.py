@@ -55,12 +55,19 @@ def shelf(monkeypatch):
     monkeypatch.setattr(colour, "LAD_NEGATIVE", (0.80, 1.20, 1.60))
 
 
-def test_the_empty_shelves_refuse_by_the_lane_that_owes_them():
+def test_the_shelves_refuse_what_they_do_not_hold(monkeypatch):
+    """An unknown stock refuses by listing the shelf; an EMPTY shelf
+    refuses by naming the lane that owes it (the state the module
+    shipped in before the constants landed)."""
     rgb = np.zeros((2, 2, 3), np.float32)
+    with pytest.raises(ValueError, match="50d"):
+        colour.negative(rgb, 1.0, "portra", grain=False)
+    with pytest.raises(ValueError, match="2383"):
+        colour.positive(rgb, "ra4paper", grain=False)
+    monkeypatch.setattr(colour, "COLOUR_FILMS", {})
+    monkeypatch.setattr(colour, "LAD_NEGATIVE", None)
     with pytest.raises(ValueError, match="FILM-C"):
         colour.negative(rgb, 1.0, "5219", grain=False)
-    with pytest.raises(ValueError, match="FILM-P"):
-        colour.positive(rgb, "2383", grain=False)
     with pytest.raises(ValueError, match="LAD"):
         colour.lad_lights("5219", "2383")
 
