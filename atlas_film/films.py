@@ -112,12 +112,16 @@ FILMS = {
     # EI 250 daylight; grey acetate base, Status M blue (FILM-N2/N9)
     "5222":    dict(fog=0.25, dmax=2.45, gamma=0.66, ht=-2.60,
                     wt=0.10, ws=0.35, grain_um2=0.817, sens=_PAN),
-    # F-4016: T-MAX RS large tank 20C, 8 min - the ISO-anchored
-    # curve (its speed point sits at -2.12 for ISO 100's -2.10);
-    # the sheet's D-76 figure is defective in print (FILM-N7)
+    # F-4016: T-MAX RS large tank 20C - the ISO-anchored curve
+    # (its speed point sits at -2.12 for ISO 100's -2.10); the
+    # sheet's D-76 figure is defective in print (FILM-N7). The
+    # normal time is 8 3/4 min, not the 8 an earlier comment
+    # carried - lane I verified the table against a render and the
+    # RS curve starts at 8.70 min (FILM-I6)
     "tmax100": dict(fog=0.21, dmax=3.13, gamma=0.525, ht=-2.25,
                     wt=0.16, ws=0.25, grain_um2=0.267, sens=_PAN),
-    # F-4043: D-76 small tank 20C, 8 min (FILM-N8)
+    # F-4043: D-76 small tank 20C, 7 1/2 min (not 8 - FILM-I7's
+    # render-verified correction; FILM-N8)
     "tmax400": dict(fog=0.24, dmax=3.07, gamma=0.74, ht=-2.39,
                     wt=0.36, ws=0.50, grain_um2=0.417, sens=_PAN),
     # THE 1890 PLATES (early-plates dossier, lane D). Both fit over
@@ -152,9 +156,89 @@ FILMS = {
     # their own table more than this curve does.
     "hd22":    dict(fog=0.0, dmax=3.5, gamma=1.870, ht=1.18,
                     wt=0.55, ws=0.80, grain_um2=0.196, sens=_BLUE),
+    # WET COLLODION (developer-hand dossier, lane I: the 1998 JIST
+    # recreation, Skladnikiewitz/Hertel/Schmidt). The curve is the
+    # traced 1.1%-iodide iron-developed characteristic (19 points
+    # off the one separable curve, axis residuals 0.001 logE /
+    # 0.009 D), carried as a SAMPLED TABLE because the bent
+    # shoulder is the source's own geometry - "densities below 1
+    # are formed only by surface silver" - and no smooth family
+    # earns it. fog=0 on the paper's net-density axis. The
+    # ABSOLUTE placement is bracketed and flagged twice over: the
+    # authors' working index DIN -9 (~ISO 0.1 by the modern
+    # conversion, the lane's own arithmetic, flagged I19) agrees
+    # with Towler's 1864 field exposures within a stop; the
+    # traced relative axis is shifted so net D 0.1 sits at the
+    # ISO-style speed point H = 0.8/0.1 = 8 lux-seconds
+    # (logH 0.90 at the traced logE_rel 0.80: offset +0.10).
+    # grain_um2 is GRANULARITY-EQUIVALENT, not crystal-literal:
+    # the measured granularity is microfilm-low (early-plates D18)
+    # while the iodide image particle is 4-6 um (I16) - Dutton's
+    # opaque-disc assumption fails for surface-stacked silver, so
+    # the noise constant follows the measurement and the conflict
+    # is recorded here. Blue-eyed: spectral max ~420 nm (I16,
+    # corroborating D13). Contrast is NOT a development-time dial
+    # for this stock (45-90 s "equally satisfactory", I18) - ci=
+    # refuses by mechanism; intensification (the real knob, I17)
+    # is the named future dial.
+    "collodion": dict(
+        fog=0.0, dmax=1.57, grain_um2=0.196, sens=_BLUE,
+        curve=(
+            (0.80, 0.90, 1.00, 1.10, 1.20, 1.30, 1.40, 1.50, 1.60,
+             1.70, 1.80, 1.90, 2.00, 2.10, 2.30, 2.50, 2.70, 2.90,
+             3.10),
+            (0.07, 0.10, 0.17, 0.30, 0.44, 0.57, 0.70, 0.81, 0.91,
+             0.96, 1.07, 1.13, 1.18, 1.22, 1.30, 1.38, 1.43, 1.49,
+             1.57))),
 }
 
 _CURVE_KEYS = ("fog", "dmax", "gamma", "ht", "wt", "ws")
+
+# THE DEVELOPER'S HAND (organ 5, developer-hand dossier). Each
+# stock's contrast-vs-development-time table for the SAME developer
+# and condition its characteristic curve was fit at, traced
+# vector-exact from the sheets' own CI figures (lane I: curve
+# identity by stroke signature, calibration residuals 0.0002-0.007
+# in data units) - except 5222's, whose five gammas are PRINTED on
+# the curves themselves and fit a linear time law to 0.007. The
+# lane's load-bearing derivation rides here: every
+# Kodak-recommended 20 C time lands on CI 0.553-0.571, so normal
+# development IS CI ~ 0.56 and push/pull is a displacement along
+# the stock's own curve. `normal` is the CI at the tabulated
+# normal time; ci= requests scale the family's gamma by
+# ci/normal, span fixed - the properly worked negative at a
+# different contrast aim, bounded by the table's own traced span
+# because extrapolating a development curve is inventing one.
+# The measure is the stock's own: contrast index (diffuse visual)
+# for the Kodak four, gamma (Status M blue) for 5222.
+CONTRAST = {
+    # FILM-I1: T-MAX Developer small tank 20C, the condition the
+    # curve constants name; 6 min -> 0.554 confirms the printed
+    # aim CI 0.56 to 0.006
+    "trix": dict(normal=0.554, minutes=6.0,
+                 developer="T-MAX small tank 20C",
+                 curve=((5.42, 0.520), (6.0, 0.554), (6.5, 0.584),
+                        (7.0, 0.614), (8.0, 0.673), (9.0, 0.737),
+                        (10.0, 0.802), (10.83, 0.856))),
+    # FILM-I8/I9: D-96 21C, gammas PRINTED on the sheet's curves;
+    # the linear law gamma = 0.0693 t + 0.216 holds to 0.007
+    "5222": dict(normal=0.66, minutes=6.5, developer="D-96 21C",
+                 curve=((4.0, 0.50), (5.0, 0.56), (6.5, 0.66),
+                        (9.0, 0.84), (12.0, 1.05))),
+    # FILM-I6: T-MAX RS large tank 20C, normal 8 3/4 min
+    "tmax100": dict(normal=0.561, minutes=8.75,
+                    developer="T-MAX RS large tank 20C",
+                    curve=((8.70, 0.560), (9.0, 0.569),
+                           (10.0, 0.599), (12.0, 0.659),
+                           (14.0, 0.724), (16.5, 0.820))),
+    # FILM-I7: D-76 small tank 20C, normal 7 1/2 min
+    "tmax400": dict(normal=0.568, minutes=7.5,
+                    developer="D-76 small tank 20C",
+                    curve=((5.29, 0.420), (6.0, 0.466),
+                           (7.0, 0.532), (7.5, 0.568),
+                           (8.0, 0.606), (9.0, 0.689),
+                           (10.0, 0.778))),
+}
 
 # RECIPROCITY (organ 3): each sheet's own compensation table as
 # (seconds, +stops) rows, interpolated in log t between rows and
@@ -187,7 +271,8 @@ def _stock(name):
             f"no such camera stock {name!r}: the shelf holds "
             + ", ".join(sorted(FILMS)))
     st = FILMS[name]
-    missing = [k for k in _CURVE_KEYS if k not in st]
+    missing = ([] if "curve" in st else
+               [k for k in _CURVE_KEYS if k not in st])
     if missing:
         raise ValueError(
             f"camera stock {name!r} has no sourced "
@@ -204,28 +289,97 @@ def _stock(name):
     return st
 
 
-def characteristic(logH, name):
+def _dev_factor(name, ci):
+    """Validate a ci= request against the stock's own contrast
+    table and return the gamma multiplier ci/normal."""
+    st = _stock(name)
+    if "curve" in st:
+        raise ValueError(
+            "collodion contrast is not a development-time dial: "
+            "45-90 s develop 'equally satisfactory' (lane I18) - "
+            "halide loading and intensification set its gamma, and "
+            "the intensification dial has not landed")
+    if name not in CONTRAST:
+        raise ValueError(
+            f"{name!r} has no contrast-vs-development table: the "
+            "plates' H&D ratio law raises Dmax with development, "
+            "and the crystal ceiling a scaled plate needs is not "
+            "yet declared - the development-factor dial lands with "
+            "the capacity question answered")
+    c = CONTRAST[name]
+    cis = [p[1] for p in c["curve"]]
+    if not min(cis) <= ci <= max(cis):
+        raise ValueError(
+            f"{name}'s sheet traces contrast only over "
+            f"{min(cis):g}..{max(cis):g} ({c['developer']}) and is "
+            f"silent at {ci:g} - extrapolating a development curve "
+            "is inventing one")
+    return ci / c["normal"]
+
+
+def minutes_for(name, ci):
+    """The development time the stock's own table asks for a
+    contrast aim - the darkroom notebook's column, inverted."""
+    _dev_factor(name, ci)       # validates stock and span, by name
+    c = CONTRAST[name]
+    ts = [p[0] for p in c["curve"]]
+    cs = [p[1] for p in c["curve"]]
+    return float(np.interp(ci, cs, ts))
+
+
+def contrast_at(name, minutes):
+    """The contrast the stock's own table gives at a development
+    time, interpolated between the sheet's traced rows."""
+    c = CONTRAST.get(name)
+    if c is None:
+        raise ValueError(
+            f"{name!r} has no contrast-vs-development table")
+    ts = [p[0] for p in c["curve"]]
+    if not ts[0] <= minutes <= ts[-1]:
+        raise ValueError(
+            f"{name}'s table spans {ts[0]:g}..{ts[-1]:g} min and "
+            f"is silent at {minutes:g}")
+    return float(np.interp(minutes, ts, [p[1] for p in c["curve"]]))
+
+
+def characteristic(logH, name, ci=None):
     """The stock's D-logH curve - H&D's straight line with a smooth
-    toe and shoulder, on the absolute lux-second axis."""
+    toe and shoulder, on the absolute lux-second axis; or, for the
+    stocks whose traced geometry IS the source (collodion's bent
+    surface-silver curve), the sampled table itself, clamped at its
+    ends because beyond the traced range the source says nothing.
+    With ci=, the curve is the one developed to that contrast: the
+    family's gamma scaled along the stock's own traced span."""
     st = _stock(name)
     x = np.asarray(logH, np.float64)
-    a = st["gamma"] * st["wt"] * np.logaddexp(0.0, (x - st["ht"])
-                                              / st["wt"])
+    if "curve" in st:
+        if ci is not None:
+            _dev_factor(name, ci)           # raises with the reason
+        cx, cd = st["curve"]
+        return st["fog"] + np.interp(x, cx, cd, left=cd[0],
+                                     right=cd[-1])
+    g = st["gamma"] * (1.0 if ci is None else _dev_factor(name, ci))
+    a = g * st["wt"] * np.logaddexp(0.0, (x - st["ht"]) / st["wt"])
     span = st["dmax"] - st["fog"]
     return st["fog"] + a - st["ws"] * np.logaddexp(
         0.0, (a - span) / st["ws"])
 
 
-def normal_highlight(name):
+def normal_highlight(name, ci=None):
     """The exposure H (lux-seconds) a normally exposed negative's
     highlights receive: H-740's latitude construction (FILM-N12)
     puts them ~1.0 D above the speed point, itself 0.10 above fog -
     so this solves the stock's own curve at D = fog + 1.10. The
-    darkroom meters the camera against it."""
+    darkroom meters the camera against it. Collodion's traced
+    curve tops at 1.57 net, so its highlight aim is capped a
+    tenth under its own ceiling rather than solved past the
+    table's reach."""
     st = _stock(name)
+    aim = min(st["fog"] + 1.10, st["dmax"] - 0.10)
     xx = np.linspace(-5.0, 4.5, 6001)
-    return float(10.0 ** np.interp(st["fog"] + 1.10,
-                                   characteristic(xx, name), xx))
+    return float(10.0 ** np.interp(aim,
+                                   characteristic(xx, name, ci=ci),
+                                   xx))
 
 
 def _project(img, st):
@@ -263,7 +417,7 @@ def reciprocity(name, t):
 
 
 def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
-             sheet=None, t=None):
+             sheet=None, t=None, ci=None):
     """Expose a camera stock to the aerial image and develop it.
 
     `img` is the aerial image - a (..., 3) RGB field collapses
@@ -288,7 +442,8 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     dose = np.maximum(_project(img, st) * E, 0.0)
     if t is not None:
         dose = dose * 2.0 ** -reciprocity(name, t)
-    D = characteristic(np.log10(np.maximum(dose, 1e-30)), name)
+    D = characteristic(np.log10(np.maximum(dose, 1e-30)), name,
+                       ci=ci)
     if not grain:
         return D.astype(np.float32)
     p = D / st["dmax"]
@@ -311,16 +466,17 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     return ((KAPPA * st["grain_um2"] / area) * n).astype(np.float32)
 
 
-def normal_exposure(img, name, percentile=99.5, t=None):
+def normal_exposure(img, name, percentile=99.5, t=None, ci=None):
     """The camera's meter for a film stage: the E that places the
     scene's bright decile - as THIS stock sees it, through its own
     spectral projection - at the stock's normal highlight. With t,
     the meter raises E by the sheet's own reciprocity compensation
     (that is literally what the tables instruct the photographer to
-    do), so the developed negative lands where it should."""
+    do), so the developed negative lands where it should; with ci,
+    it meters against the curve as developed to that contrast."""
     st = _stock(name)
     ref = float(np.percentile(_project(img, st), percentile))
-    E = normal_highlight(name) / max(ref, 1e-12)
+    E = normal_highlight(name, ci=ci) / max(ref, 1e-12)
     if t is not None:
         E *= 2.0 ** reciprocity(name, t)
     return E
