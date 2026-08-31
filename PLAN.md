@@ -175,6 +175,61 @@ golden rows pinned, twenty untouched. Still open here: organs 3 and
 4 now have their home at this stage, wet/dry plate stocks are
 wanted sources, and the enlarger is ideal by declaration.*
 
+## 7. Colour: the cinema chain
+
+*Planned 2026-08-31, before the work, with the route chosen for
+sourceability: VISION3 camera negatives printed onto 2383 print
+film. The stills chain (Portra onto RA-4 paper) is deliberately
+second - its modern sheets publish Print Grain Index, which Kodak's
+own E-58 says cannot be compared with rms granularity, so its grain
+has no honest route yet; the cinema sheets publish rms curves and
+the print side has a real counterpart with published curves of its
+own.*
+
+**The model.** A colour negative is three of the sheets organ 6
+built, stacked: blue-, green- and red-sensitive layers, each its
+own crystal field with its own curve, seed and grain. Layer
+exposures come from the render's channels through a per-stock 3x3
+sensitivity matrix (derived from the published spectral-sensitivity
+figures; the render is RGB, not a spectrum, and the matrix IS this
+system's fidelity ceiling - declared). Each layer's developed dye
+carries a per-dye absorption triple (read off the published
+spectral-dye-density figures), and the three Status M channel
+densities assemble as base + sum of dye contributions - the
+integral orange mask is not modelled separately, because the
+published per-channel D-min floors and curves already carry it.
+
+**The assembly referee, before anything ships:** driven with a
+NEUTRAL exposure sweep, the assembled model must reproduce the
+datasheet's own three published curves within read-off tolerance.
+The constants come from the same figures the referee checks against
+- so the check is that the ASSEMBLY (matrix, curves, dyes, base)
+is coherent, not circular curve-fitting; it is watched failing with
+placeholder assembly first.
+
+**Grain, honestly downgraded.** Dye clouds are not opaque discs -
+Dutton's own derivation, already in the film-grain dossier,
+excludes "partially transparent cells such as in a dye image". So
+per-layer grain uses the same thinning machinery with a
+GRANULARITY-EQUIVALENT area matched to the sheet's published rms
+curves, declared as a noise constant and not a measured cloud size.
+Colour grain here is honest about being one rung below the
+crystal-literal claim the B&W sheets earned; the rung is named.
+
+**Printing is LAD.** The print stage exposes 2383's three layers
+through the negative's per-channel transmittance, and the printer
+is calibrated the way laboratories calibrate: a mid-scale LAD grey
+on the negative prints to the published aim densities on the print
+film - per-channel printer exposures solved against sourced aims,
+not metered by taste. Print-side grain by the same declared
+granularity-equivalence; projection transfer declared.
+
+**Wiring:** `film="5219"` (etc.) makes the negative colour;
+`print_film="2383"` prints it; the B&W paper processes still accept
+a colour negative through its transmitted luminance (a real
+practice, declared as such). Golden rows bake as new rows; nothing
+existing moves. Refusals everywhere constants are missing, by name.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
