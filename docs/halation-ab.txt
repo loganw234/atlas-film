@@ -1,0 +1,1 @@
+python tools/halation_ab.py --plate 44 --px 2800 --passes 700 --gain 0.6 --out prints/halation-ab.png

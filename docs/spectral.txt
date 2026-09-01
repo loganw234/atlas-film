@@ -1,0 +1,1 @@
+python tools/plate_eye.py --plate 44 --px 4200 --passes 1600 --out prints/plate-eye-e8.png

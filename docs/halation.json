@@ -1,0 +1,20 @@
+{
+ "1.3 mm plate glass": {
+  "index": 1.529,
+  "r_c_um": 2247.8695134882946,
+  "reflected_fraction": 0.6013631937590732,
+  "support_um": 1300.0
+ },
+ "127 um 35mm acetate": {
+  "index": 1.4925,
+  "r_c_um": 229.2519380051687,
+  "reflected_fraction": 0.5463645495471369,
+  "support_um": 127.0
+ },
+ "178 um sheet acetate": {
+  "index": 1.4925,
+  "r_c_um": 321.3137398812601,
+  "reflected_fraction": 0.5463645495471369,
+  "support_um": 178.0
+ }
+}

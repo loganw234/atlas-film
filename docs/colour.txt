@@ -1,0 +1,1 @@
+python tools/grain_sheet.py --colour-negative 1 --px 8192 --passes 900 --film 50d --print-film 2383  (586 s, peak RSS 19.9 GB; the colour chain works in float64, so 16384 would want ~80 GB)
