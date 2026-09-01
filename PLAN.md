@@ -531,9 +531,38 @@ r = 2 t tan(theta), and the surface density works out to
 
 - the cos^4 law again, arriving from a different direction. R is
 Fresnel: a few percent below the critical angle, unity above. So
-the point spread is a weak disc that JUMPS at r_c = 2 t tan(asin(
-1/n)) and decays outward: the bright-edged annulus the period
-literature describes, with no free shape parameter at all. Only
+the point spread is a weak disc that CLIMBS to a peak at
+r_c = 2 t tan(asin(1/n)) and decays outward: the bright-edged
+annulus the period literature describes, with no free shape
+parameter at all.
+
+*(Correction, same day, before any constant landed: this
+paragraph first said the spread JUMPS at r_c, and the arithmetic
+says otherwise. Fresnel reflectance climbs to unity CONTINUOUSLY
+as theta approaches the critical angle, so there is no
+discontinuity - the profile rises to 7.9x the centre value with
+its maximum exactly at r_c, then decays. The ring is real and the
+plan's geometry is unchanged; the word was wrong.
+
+And then the correction's own word was wrong in the other
+direction, caught by its referee an hour later: "smoothly" is not
+right either. 1 - R goes as sqrt(theta_c - theta), so the profile
+reaches its peak with an INFINITE derivative - a CUSP, continuous
+but not differentiable, the outside/inside ratio falling by
+exactly sqrt(10) per decade of epsilon on its way to 1. Which is
+the better answer to what the period sources were describing all
+along when they called it a sharply defined edge. Recorded in
+both directions because a plan that only records the corrections
+that flatter it is not a record.
+Two further facts the same check turned up, both load-bearing:
+only 6.9% of the returned light falls INSIDE r_c and 60% inside
+2 r_c, so the halo is far broader than the ring radius alone
+suggests and the kernel must reach ~10 r_c to hold 98%; and the
+planar integral of p closes on the angular one to the truncated
+tail (0.5797 against 0.5840 at n=1.48), which is the derivation
+checking itself.)*
+
+Only
 two numbers per stock are wanted - the support thickness and its
 index - and both are datasheet facts. The kernel goes to frequency
 space numerically, exactly as organ 8's transfer does; no closed
@@ -561,6 +590,24 @@ the very bottom of the traced range, which is uncomfortably close.
 The traced curves' own low-frequency behaviour is evidence either
 way and will be read before the constants land. Whatever it says
 gets written down, including if it says the two organs overlap.
+
+*(Answered the same day, by the geometry rather than by
+assertion. The halation transfer is K(f) = the Hankel transform
+of the unit-normalised spread, and it collapses fast: for a
+132 um acetate base K falls to +0.06 by 1 c/mm, -0.11 at 2, and
+is within 0.001 of zero from 5 c/mm upward; for a 1.2 mm plate it
+is done by 0.5 c/mm. Every traced MTF on the shelf carries its
+lowest datum at or above 2.5 c/mm. So across the ENTIRE measured
+range halation contributes no SHAPE - only the flat factor
+(1 - g) - and a curve normalised to unity divides exactly that
+factor out. The two organs are separable in frequency: organ 8
+owns 2.5 c/mm upward, organ 10 owns everything below, and the
+normalisation is the seam. They do not double-count, and the
+reason is arithmetic that can be re-run rather than a judgement
+call. What follows from it, and is less comfortable: the
+published MTF therefore carries NO information about g, so the
+strength cannot be bounded from the curves and must come from
+the lanes or be refused.)*
 
 **Default and switch.** ON where the constants exist, by organ 8's
 argument: a plate that cannot halate is the lie now. `halation=
