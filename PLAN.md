@@ -493,6 +493,95 @@ Jones & Condit measured). Of the three structural gaps, two are
 closed and the third - the emulsion's sharpness - waits only on
 lane L's traces.*
 
+## Organ 10 - halation, the light that comes back
+
+*Planned 2026-08-31, before the work. Lanes FILM-N (the physics
+and geometry), FILM-Q (per-stock base and antihalation), FILM-R
+(the plates, the period record, backed versus unbacked) dispatched
+at the same hour.*
+
+**The absence.** Halation exists in this system already and is in
+the WRONG PLACE, which is worse than missing. `darkroom.halation`
+was written when the render went straight to paper: it applies an
+annulus to the AERIAL image, before any emulsion, with a hand-set
+`halation_radius=140.0` and a hand-set strength, off by default,
+and it does not know which sheet is loaded. `atlas_film` does not
+contain the word. So the 1890 plates - whose defining signature is
+a bright window blooming into a halo millimetres across, because
+nobody put anything behind the glass - halate exactly as much as
+rem-jet-backed VISION3, namely not at all.
+
+**The mechanism, and why it belongs to the sheet.** Light that has
+already exposed the emulsion scatters within it, crosses the
+support, and meets the support/air boundary at the back. Beyond
+the critical angle it is totally internally reflected; below it,
+Fresnel returns a few percent. What comes back up re-exposes the
+emulsion at a radial displacement set by the support's own
+thickness and index. That is a statement about what a stock does
+to light, so the constants are the medium's and the organ lands
+in `atlas_film/halation.py` beside `mtf.py`, applied at the
+negative's own pitch by the same discipline.
+
+**The geometry is derived, not dialled.** With the emulsion
+scattering into the base as a Lambertian source, the flux into
+angle theta is sin(2 theta) d theta, the return lands at radius
+r = 2 t tan(theta), and the surface density works out to
+
+    p(r) = R(theta) cos^4(theta) / (4 pi t^2),  theta = atan(r / 2t)
+
+- the cos^4 law again, arriving from a different direction. R is
+Fresnel: a few percent below the critical angle, unity above. So
+the point spread is a weak disc that JUMPS at r_c = 2 t tan(asin(
+1/n)) and decays outward: the bright-edged annulus the period
+literature describes, with no free shape parameter at all. Only
+two numbers per stock are wanted - the support thickness and its
+index - and both are datasheet facts. The kernel goes to frequency
+space numerically, exactly as organ 8's transfer does; no closed
+form is needed and none is faked.
+
+**What must be sourced or refused.** The STRENGTH: what fraction
+of the exposing light enters the base as wide-angle scatter, and
+what the antihalation measure removes from it. An undercoat
+absorbs on the way down and again on the way back, so a density D
+attenuates by 10^(-2D) - a double pass the sources must confirm.
+Rem-jet is near-total suppression. An unbacked plate removes
+nothing, and the arithmetic above says roughly half of what
+scatters downward comes back, which is why the effect was worth a
+century of chemistry. Every stock whose sheet is silent on its
+base REFUSES to halate rather than guess, by name, as usual.
+
+**The honesty question the organ must answer, not dodge.** A
+published MTF is measured on the real film INCLUDING whatever
+halation it has, so an organ that applies both risks counting the
+same light twice. The defence is that MTF curves are normalised
+to unity at low frequency and a halo hundreds of microns wide IS
+a low-frequency spread, so the normalisation divides most of it
+out - but the ring's characteristic frequency (~2 c/mm) sits at
+the very bottom of the traced range, which is uncomfortably close.
+The traced curves' own low-frequency behaviour is evidence either
+way and will be read before the constants land. Whatever it says
+gets written down, including if it says the two organs overlap.
+
+**Default and switch.** ON where the constants exist, by organ 8's
+argument: a plate that cannot halate is the lie now. `halation=
+False` kills it. A pitch too coarse to resolve r_c is a
+bit-identical no-op (`out is img`), so only rows whose ring
+resolves at the golden raster move, each re-pinned with its why.
+The darkroom's old aerial dial stays exactly as it is - existing
+work may lean on it - documented as the aesthetic sibling of
+`bloom`, with the note that setting both counts the light twice
+and that is the operator's choice to make.
+
+**Referees, watched failing first.** A single lit pixel on an
+unbacked plate, developed, its radial density profile read: the
+inner edge of the ring must land at 2 t tan(theta_c) within a
+stated tolerance - the geometry read back off an actual print,
+the house method. The same test on a sourced undercoat shows the
+sourced attenuation. Halation ADDS light, so the frame's total
+dose rises by the reflected fraction and never falls. Coarse
+pitch returns the input object identically. A stock with no
+sourced support refuses by name.
+
 ## Non-goals
 
 Rendering anything (the darkroom's), print formats and sheet
