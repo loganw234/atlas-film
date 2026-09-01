@@ -619,6 +619,63 @@ work may lean on it - documented as the aesthetic sibling of
 `bloom`, with the note that setting both counts the light twice
 and that is the operator's choice to make.
 
+*Landed 2026-08-31. Three lanes and three sub-lanes returned 78
+entries, and they changed the organ twice before a constant
+shipped. The GEOMETRY closed harder than planned: Cornu published
+rho = 2e tan R to the Academie des Sciences in 1890 - the same
+year as the plates on this shelf - with 2 rho = 3.578e at n = 3/2,
+"conformes a l'experience", and described the profile as a circle
+sharp at the inner edge "degrade vers l'exterieur", which is the
+cusp-then-decay this repo had derived from Fresnel a day earlier
+without knowing he existed. Law re-derived the same cos^4 kernel
+for television in 1939; Dailliez and Hebert publish it as a
+coated-print PSF in 2022 and 2023; DeStefano measured the factor
+2 to 5% in 2025. Cornu also answered, experimentally, the
+objection the plan could only argue: the halo forms identically
+through a simple lens, a compound objective, a concave mirror and
+a pierced card, so the f-number never enters.
+
+The STRENGTH did not close, and the plan's guess that it might be
+bounded from the MTF curves was already ruled out by the plan's
+own arithmetic. It is simply not published: no measured radial
+density profile across a halation ring in real film, no
+halation-to-direct ratio, no measured returning fraction - across
+archive.org, the Kodak/Agfa/Fuji/3M patent families, Kodak H-1
+and H-24, SMPTE, IS&T, PMC, HathiTrust, Gallica, and Crossref
+title sweeps returning ZERO for "halation" in JOSA, Applied
+Optics, SMPTE Journal and JOSA A. So `halation=` ships as a
+FRACTION of a sourced ceiling and is named the operator's. The
+one paper that would close it - Vendrovsky & Pakoushko 1964,
+whose equations assume exactly this organ's Lambertian premise
+and whose "experimental trials show the equations are valid" - is
+paywalled and is the organ's standing acquisition target.
+
+Two corrections the lanes forced. The source is Lambertian in the
+GELATIN, not in the support, and gelatin (1.541, Kodak's own
+patent) is DENSER than acetate or glass - so a share of the
+hemisphere never crosses at all and the spread scales by
+(n2/n1)^2. That is exact for acetate and glass and WRONG for
+ESTAR, where the denser support bounds the halo at a hard outer
+edge instead; ESTAR refuses anyway, because photographic PET is
+birefringent (1.65 in-plane against 1.50 through) and no single
+index would be honest. And the halo is a ring TRAIN at integral
+multiples of r_c, which the BBC measured in 1960 - the model
+truncates at first order and says so.
+
+Only the 1890 plates halate. Not a compromise: they are the one
+case where "no antihalation measure" is POSITIVELY sourced rather
+than merely unstated, and the dating chain is tight (Wall 1897
+gives DIY recipes and accepts unbacked working; Oakley 1897 says
+substrata "have failed to answer in practice"; 1900 still calls
+ready-backed plates "A REVOLUTION IN PHOTOGRAPHY"; Wall 1912 says
+"almost all commercial plates"). Every other stock refuses with
+its own reason and no two are boilerplate - grey base with no
+published density, total silence, a backing stated without a
+density, and collodion on PHYSICS, since Abney ranks gelatin as
+halating worse despite collodion's far thicker glass. 147 tests;
+one new golden row, the other 42 bit-identical because the organ
+is off until asked.*
+
 **Referees, watched failing first.** A single lit pixel on an
 unbacked plate, developed, its radial density profile read: the
 inner edge of the ring must land at 2 t tan(theta_c) within a

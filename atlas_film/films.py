@@ -596,7 +596,7 @@ def _intensify_factor(name, intensify):
 
 def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
              sheet=None, t=None, ci=None, intensify=None,
-             batch=None, mtf=True, halation=True):
+             batch=None, mtf=True, halation=None):
     """Expose a camera stock to the aerial image and develop it.
 
     `img` is the aerial image - a (..., 3) RGB field collapses
@@ -618,11 +618,13 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     `sheet=`. `intensify` (organ 5b) is the wet plate's bath: the
     developed field - grain and all - multiplies by the sourced
     recipe's factor, applied LAST because the bath touches silver
-    the developer already made. `halation` (organ 10, on by
-    default) sends light across the stock's own support and back
-    off its rear surface, redistributing it into the ring the
-    support's thickness and index dictate; stocks whose sheets do
-    not state a base do not halate at all.
+    the developer already made. `halation` (organ 10) sends light
+    across the stock's own support and back off its rear surface,
+    redistributing it into the ring the support's thickness and
+    index dictate - a FRACTION in [0, 1] of the sourced ceiling,
+    because that geometry is sourced three times over and the
+    strength is not sourced at all. None leaves it off; a stock
+    the record cannot support raises with its own reason.
     """
     st = _stock(name)
     f = _intensify_factor(name, intensify)
@@ -633,20 +635,30 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
         # Needs the pitch, like grain - a curve evaluation without
         # a sheet geometry has no spatial physics to apply.
         dose = _mtf_apply(dose, _MTF_BW[name], float(pitch_um))
-    if halation and pitch_um and dose.ndim == 2:
+    if halation is not None:
         # THE LIGHT THAT COMES BACK (organ 10): across the support
         # and off its back surface. Order against organ 8 does not
         # matter - both are linear transfers and commute exactly -
         # and the halo's hundreds of microns dwarf the emulsion's
-        # own few-micron turbidity either way. A stock whose sheet
-        # is silent on its base returns None here and does not
-        # halate; see the shelf table for which those are.
-        spec = _halation_for(name)
-        if spec is not None:
-            support_um, index, g = spec
-            dose = _halation_apply(dose, pitch_um=float(pitch_um),
-                                   support_um=support_um,
-                                   index=index, strength=g)
+        # own few-micron turbidity either way. OFF unless asked,
+        # because the geometry is sourced three times over and the
+        # STRENGTH is not sourced at all: `halation` is a fraction
+        # of the ceiling and the operator owns it. Stocks the
+        # record cannot support raise here, each with its own
+        # reason - this is not a silent skip.
+        if dose.ndim != 2:
+            raise ValueError(
+                "halation applies to a single exposure plane; a "
+                "colour stock has no sourced base thickness "
+                "anyway (organ 10)")
+        if not pitch_um:
+            raise ValueError(
+                "halation is a displacement in microns on the "
+                "sheet: pass pitch_um")
+        support_um, index, g = _halation_for(name, halation)
+        dose = _halation_apply(dose, pitch_um=float(pitch_um),
+                               support_um=support_um,
+                               index=index, strength=g)
     pour = None
     if batch is not None:
         shift, pour = _batch_draw(name, batch, dose.shape)

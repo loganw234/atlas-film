@@ -19,7 +19,9 @@ import pytest
 
 from atlas_film import films, halation as H
 
-ACETATE, GLASS, ESTAR = 1.48, 1.52, 1.64
+ACETATE = H.INDICES["acetate"]          # 1.4925, Kodak's own range
+GLASS = H.INDICES["plate-glass-blue"]    # 1.5290, blue: the plates are blue-eyed
+ESTAR = 1.64                            # in-plane PET; refused as a support
 
 
 def test_j0_lands_on_its_own_zeros():
@@ -38,8 +40,8 @@ def test_the_critical_radius_is_the_angle_it_claims():
     # acetate's ring is 1.83 support-thicknesses out; the denser
     # the support the tighter the ring, because more of the
     # hemisphere lies beyond a smaller critical angle
-    assert H.critical_radius(1.0, ACETATE) == pytest.approx(1.8331, abs=1e-4)
-    assert H.critical_radius(1.0, GLASS) == pytest.approx(1.7471, abs=1e-4)
+    assert H.critical_radius(1.0, ACETATE) == pytest.approx(1.8051, abs=1e-4)
+    assert H.critical_radius(1.0, GLASS) == pytest.approx(1.7291, abs=1e-4)
     assert H.critical_radius(1.0, ESTAR) == pytest.approx(1.5386, abs=1e-4)
 
 
@@ -75,14 +77,14 @@ def test_the_spread_is_continuous_but_cusped_at_the_ring():
     t, n = 132.0, ACETATE
     ratio = (H.spread(np.array([H.critical_radius(t, n)]), t, n)[0]
              / H.spread(np.array([1e-9]), t, n)[0])
-    assert ratio == pytest.approx(7.9, abs=0.1)
+    assert ratio == pytest.approx(7.8, abs=0.1)
 
 
 def test_the_planar_integral_closes_on_the_angular_one():
     """Two independent routes to the same number: integrate the
     surface density over the plane, or the Fresnel reflectance
     over the Lambertian hemisphere. The derivation checks itself."""
-    for t, n in [(132.0, ACETATE), (1200.0, GLASS), (132.0, ESTAR)]:
+    for t, n in [(132.0, ACETATE), (1200.0, GLASS)]:
         r = np.linspace(1e-9, 4000.0 * t / 132.0, 2000001)
         planar = np.trapezoid(H.spread(r, t, n) * 2 * np.pi * r, r)
         angular = H.reflected_fraction(n)
@@ -96,9 +98,11 @@ def test_the_reflected_share_exceeds_pure_total_internal_reflection():
     is 1 - 1/n^2 of a Lambertian hemisphere; the sub-critical
     Fresnel few percent sits on top. High enough - well over half
     - to explain a century of antihalation chemistry."""
-    for n, want in [(ACETATE, 0.5840), (GLASS, 0.6082), (ESTAR, 0.6698)]:
+    for n, want in [(ACETATE, 0.5464), (GLASS, 0.6014)]:
         f = H.reflected_fraction(n)
-        assert f > 1.0 - 1.0 / n ** 2
+        # the pure-TIR share of a hemisphere, less what the
+        # emulsion/support interface turns back before it crosses
+        assert f > (1.0 - 1.0 / n ** 2) * (n / H.EMULSION_INDEX) ** 2
         assert f == pytest.approx(want, abs=5e-4)
         assert f < 1.0
 
@@ -114,9 +118,9 @@ def test_the_halo_is_far_broader_than_its_ring():
     cum = np.concatenate([[0.0], np.cumsum(np.diff(r) * 0.5 * (p[1:] + p[:-1]))])
     total = H.reflected_fraction(n)
     enclosed = lambda m: cum[int(np.searchsorted(r, rc * m))] / total
-    assert enclosed(1.0) == pytest.approx(0.069, abs=0.005)
-    assert enclosed(2.0) == pytest.approx(0.607, abs=0.010)
-    assert enclosed(10.0) == pytest.approx(0.980, abs=0.005)
+    assert enclosed(1.0) == pytest.approx(0.070, abs=0.005)
+    assert enclosed(2.0) == pytest.approx(0.612, abs=0.010)
+    assert enclosed(10.0) == pytest.approx(0.986, abs=0.005)
 
 
 def test_the_transfer_is_exactly_unity_at_dc():
@@ -144,7 +148,7 @@ def test_light_is_redistributed_not_created():
     job. Nothing is created and nothing is quietly lost."""
     rng = np.random.default_rng(10)
     img = rng.random((256, 256)) ** 3
-    for t, n, g in [(132.0, ACETATE, 0.20), (60.0, ESTAR, 0.30)]:
+    for t, n, g in [(132.0, ACETATE, 0.20), (60.0, GLASS, 0.30)]:
         out = H.apply(img, pitch_um=50.0, support_um=t, index=n, strength=g)
         assert out.sum() == pytest.approx(img.sum(), rel=2e-5)
 
@@ -217,28 +221,85 @@ def test_the_transfer_collapses_below_the_mtf_floor():
 
 def test_the_antihalation_measure_pays_the_double_pass():
     """A dyed undercoat absorbs going down and again coming back,
-    so a density D costs 10^(-2D), not 10^(-D)."""
-    bare = H.strength(132.0, ACETATE, 0.0, 0.35)
+    so a density D costs 10^(-2D), not 10^(-D). The only source
+    that states this arithmetic is a BBC television report on the
+    CRT analogue - the photographic literature describes the
+    double pass and never algebraises it, and the citation says
+    so rather than borrowing plausibility from a film datasheet."""
+    bare = H.ceiling(ACETATE, 0.0)
     for d in (0.3, 1.0, 2.0):
-        assert H.strength(132.0, ACETATE, d, 0.35) == pytest.approx(
+        assert H.ceiling(ACETATE, d) == pytest.approx(
             bare * 10.0 ** (-2.0 * d), rel=1e-12)
-    assert bare == pytest.approx(0.35 * H.reflected_fraction(ACETATE), rel=1e-12)
+    assert bare == pytest.approx(H.reflected_fraction(ACETATE), rel=1e-12)
 
 
-def test_an_unsourced_stock_halates_not_at_all():
-    """No support is invented. The geometry is so willing that any
-    thickness at all yields a plausible halo, which is exactly why
-    a stock whose sheet is silent on its base must be BIT-IDENTICAL
-    with the dial on and off - not approximately unchanged."""
-    rng = np.random.default_rng(7)
-    img = rng.random((96, 96)) * 0.6 + 0.2
+def test_the_gain_is_a_fraction_of_a_sourced_ceiling():
+    """The strength is the one quantity nobody published, so it is
+    the operator's - but it is measured against a bound the record
+    DOES fix, not against nothing. Outside [0, 1] it would return
+    more light than the support reflects, and refuses."""
+    for gain in (0.0, 0.25, 1.0):
+        _, index, g = H.for_stock("manchester", gain)
+        assert g == pytest.approx(gain * H.ceiling(index, 0.0), rel=1e-12)
+    for bad in (-0.01, 1.5, 3.0):
+        with pytest.raises(ValueError, match="fraction of the SOURCED CEILING"):
+            H.for_stock("manchester", bad)
+
+
+def test_the_plates_halate_and_everything_else_says_why_not():
+    """The organ's whole point, and its whole honesty in one test.
+    The 1890 plates are the only stocks whose antihalation state
+    is POSITIVELY sourced - they had none, and the trade record
+    dates the change to 1900-1912 - so they are the only ones that
+    halate. Every other stock raises, and no two reasons are the
+    same boilerplate."""
+    assert set(H.SUPPORTS) == {"manchester", "hd22"}
+    reasons = set()
     for name in sorted(films.FILMS):
         if name in H.SUPPORTS:
             continue
-        assert H.for_stock(name) is None
+        with pytest.raises(ValueError, match="does not halate"):
+            H.for_stock(name, 0.5)
+        reasons.add(H.REFUSALS.get(name, ""))
+    assert "" not in reasons, "a stock refuses without a stated reason"
+    assert len(reasons) >= 6, "the refusals have collapsed into boilerplate"
+    # and the one that refuses on PHYSICS rather than on silence
+    assert "BY MECHANISM" in H.REFUSALS["collodion"]
+
+
+def test_the_organ_is_off_until_asked():
+    """Default OFF, and bit-identically so - not approximately
+    unchanged. Every negative made before organ 10 existed still
+    develops to the same digits, which is what lets 42 golden
+    prints stay pinned through the landing."""
+    rng = np.random.default_rng(7)
+    img = rng.random((96, 96)) * 0.6 + 0.2
+    for name in ("manchester", "hd22", "trix", "collodion"):
         E = films.normal_highlight(name) / 0.5 * 0.3
-        on = films.negative(img, E, name, pitch_um=12.0, grain=False,
-                            halation=True)
-        off = films.negative(img, E, name, pitch_um=12.0, grain=False,
-                             halation=False)
-        assert np.array_equal(on, off), name
+        base = films.negative(img, E, name, pitch_um=12.0, grain=False)
+        none = films.negative(img, E, name, pitch_um=12.0, grain=False,
+                              halation=None)
+        assert np.array_equal(base, none), name
+    # and zero gain is a no-op even where the stock DOES halate
+    E = films.normal_highlight("manchester") / 0.5 * 0.3
+    assert np.array_equal(
+        films.negative(img, E, "manchester", pitch_um=12.0, grain=False),
+        films.negative(img, E, "manchester", pitch_um=12.0, grain=False,
+                       halation=0.0))
+
+
+def test_a_plate_veils_more_than_it_rings():
+    """Wall 1912: halation is "present in every photograph if the
+    plate is not backed, destroying its quality and ruining its
+    rendering of gradation" - not merely a ring around windows.
+    At a pitch where a 1.3 mm plate's 2.2 mm halo is far wider
+    than the frame, the visible effect must be exactly that: a
+    global loss of tonal separation, with the dose conserved."""
+    rng = np.random.default_rng(11)
+    img = rng.random((160, 160)) ** 2 * 0.8 + 0.05
+    E = films.normal_highlight("manchester") / 0.5 * 0.3
+    plain = films.negative(img, E, "manchester", pitch_um=60.0, grain=False)
+    veiled = films.negative(img, E, "manchester", pitch_um=60.0,
+                            grain=False, halation=0.8)
+    assert veiled.std() < plain.std()
+    assert veiled.max() - veiled.min() < plain.max() - plain.min()
