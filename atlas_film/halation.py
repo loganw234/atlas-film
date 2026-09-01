@@ -190,6 +190,18 @@ def strength(support_um, index, ah_density, scatter):
             * 10.0 ** (-2.0 * float(ah_density)))
 
 
+def for_stock(name):
+    """(support_um, index, g) for a named stock, or None if its
+    sheet is silent on its base - in which case the stock does not
+    halate, rather than halating by invention."""
+    spec = SUPPORTS.get(name)
+    if spec is None or SCATTER is None:
+        return None
+    support_um, index, ah_density = spec
+    return (support_um, index,
+            strength(support_um, index, ah_density, SCATTER))
+
+
 def apply(img, *, pitch_um, support_um, index, strength):
     """Redistribute a 2-D linear-exposure image by the support's
     halation at the given pitch - exact, in frequency space,

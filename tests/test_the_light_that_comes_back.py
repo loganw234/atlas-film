@@ -17,7 +17,7 @@ light twice, pinned here so it cannot rot quietly.
 import numpy as np
 import pytest
 
-from atlas_film import halation as H
+from atlas_film import films, halation as H
 
 ACETATE, GLASS, ESTAR = 1.48, 1.52, 1.64
 
@@ -225,10 +225,20 @@ def test_the_antihalation_measure_pays_the_double_pass():
     assert bare == pytest.approx(0.35 * H.reflected_fraction(ACETATE), rel=1e-12)
 
 
-def test_the_shelf_refuses_what_it_cannot_source():
+def test_an_unsourced_stock_halates_not_at_all():
     """No support is invented. The geometry is so willing that any
     thickness at all yields a plausible halo, which is exactly why
-    an unsourced stock must halate not at all."""
-    for name in ("trix", "manchester", "collodion", "50d"):
-        if name not in H.SUPPORTS:
-            assert H.SUPPORTS.get(name) is None
+    a stock whose sheet is silent on its base must be BIT-IDENTICAL
+    with the dial on and off - not approximately unchanged."""
+    rng = np.random.default_rng(7)
+    img = rng.random((96, 96)) * 0.6 + 0.2
+    for name in sorted(films.FILMS):
+        if name in H.SUPPORTS:
+            continue
+        assert H.for_stock(name) is None
+        E = films.normal_highlight(name) / 0.5 * 0.3
+        on = films.negative(img, E, name, pitch_um=12.0, grain=False,
+                            halation=True)
+        off = films.negative(img, E, name, pitch_um=12.0, grain=False,
+                             halation=False)
+        assert np.array_equal(on, off), name

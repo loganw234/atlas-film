@@ -45,6 +45,8 @@ import numpy as np
 from atlas_film import emulsion
 from atlas_film.mtf import MTF_BW as _MTF_BW
 from atlas_film.mtf import apply as _mtf_apply
+from atlas_film.halation import apply as _halation_apply
+from atlas_film.halation import for_stock as _halation_for
 from atlas_film.processes import KAPPA
 
 # THE CURVE FAMILY IS SENSITOMETRY'S OWN, not the print table's. A
@@ -594,7 +596,7 @@ def _intensify_factor(name, intensify):
 
 def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
              sheet=None, t=None, ci=None, intensify=None,
-             batch=None, mtf=True):
+             batch=None, mtf=True, halation=True):
     """Expose a camera stock to the aerial image and develop it.
 
     `img` is the aerial image - a (..., 3) RGB field collapses
@@ -616,7 +618,11 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
     `sheet=`. `intensify` (organ 5b) is the wet plate's bath: the
     developed field - grain and all - multiplies by the sourced
     recipe's factor, applied LAST because the bath touches silver
-    the developer already made.
+    the developer already made. `halation` (organ 10, on by
+    default) sends light across the stock's own support and back
+    off its rear surface, redistributing it into the ring the
+    support's thickness and index dictate; stocks whose sheets do
+    not state a base do not halate at all.
     """
     st = _stock(name)
     f = _intensify_factor(name, intensify)
@@ -627,6 +633,20 @@ def negative(img, E, name, *, pitch_um=None, grain=True, seed=0,
         # Needs the pitch, like grain - a curve evaluation without
         # a sheet geometry has no spatial physics to apply.
         dose = _mtf_apply(dose, _MTF_BW[name], float(pitch_um))
+    if halation and pitch_um and dose.ndim == 2:
+        # THE LIGHT THAT COMES BACK (organ 10): across the support
+        # and off its back surface. Order against organ 8 does not
+        # matter - both are linear transfers and commute exactly -
+        # and the halo's hundreds of microns dwarf the emulsion's
+        # own few-micron turbidity either way. A stock whose sheet
+        # is silent on its base returns None here and does not
+        # halate; see the shelf table for which those are.
+        spec = _halation_for(name)
+        if spec is not None:
+            support_um, index, g = spec
+            dose = _halation_apply(dose, pitch_um=float(pitch_um),
+                                   support_um=support_um,
+                                   index=index, strength=g)
     pour = None
     if batch is not None:
         shift, pour = _batch_draw(name, batch, dose.shape)
