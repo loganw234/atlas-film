@@ -1,0 +1,29 @@
+# The medium's suite: pure numpy, no GL, no plates, no darkroom - which
+# is exactly the set a hosted runner can install, and the contract this
+# package makes about itself. Lint runs the darkroom's correctness-only
+# rule set, carried across the seam in pyproject.toml.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e .[test] ruff
+      # -rs so the log names every skip; a skip nobody can see is a
+      # test nobody has
+      - run: python -m pytest -q -rs
+      - run: python -m ruff check .

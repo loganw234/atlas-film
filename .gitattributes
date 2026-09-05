@@ -1,0 +1,7 @@
+# LF in the repository whatever the checkout, and the committed figure
+# sidecars - the numbers each figure was drawn from - are compared by
+# digest and must never be rewritten on the way in or out.
+* text=auto
+*.json -text
+*.png binary
+*.jpg binary
