@@ -235,7 +235,10 @@ def test_the_layers_talk_by_the_printed_ratio():
                                     interimage=False)[:, 0, ch] \
                 - base
 
-            def chord(y):
+            # bound as a default, not closed over: the closure is called on
+            # the next line and would be right either way, but a loop
+            # variable captured by reference is the classic later-bug
+            def chord(y, span=span):
                 lo = int(np.searchsorted(y, 0.25 * span))
                 hi = int(np.searchsorted(y, 0.75 * span))
                 hi = min(max(hi, lo + 2), len(xx) - 1)
